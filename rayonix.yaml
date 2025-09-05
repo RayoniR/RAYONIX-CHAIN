@@ -1,0 +1,346 @@
+# Rayonix Blockchain Node Configuration
+# Network Configuration
+network:
+  network_type: "mainnet"
+  network_id: 1
+  listen_ip: "0.0.0.0"
+  listen_port: 30303
+  public_ip: null
+  public_port: null
+  max_connections: 50
+  max_peers: 1000
+  connection_timeout: 30
+  message_timeout: 10
+  ping_interval: 60
+  enable_nat_traversal: true
+  enable_encryption: true
+  enable_compression: true
+  enable_dht: true
+  enable_gossip: true
+  bootstrap_nodes:
+    - "node1.rayonix.org:30303"
+    - "node2.rayonix.org:30303"
+    - "node3.rayonix.org:30303"
+  allowed_peers: []
+  blocked_peers: []
+
+# Consensus Configuration
+consensus:
+  consensus_type: "pos"
+  block_time: 30
+  block_reward: 50
+  halving_interval: 210000
+  difficulty_adjustment_blocks: 2016
+  min_stake: 1000
+  max_stake: 10000000
+  stake_locktime: 86400
+  slash_percentage: 0.01
+  jail_duration: 3600
+  epoch_blocks: 100
+  max_validators: 100
+  validator_commission: 0.1
+  unbonding_period: 172800
+  min_delegation: 100
+  governance_enabled: true
+  proposal_deposit: 1000
+  voting_period: 259200
+
+# Database Configuration
+database:
+  db_type: "leveldb"
+  db_path: "./rayonix_data"
+  compression: "snappy"
+  encryption: "fernet"
+  cache_size: 134217728
+  max_open_files: 1000
+  write_buffer_size: 67108864
+  bloom_filter_bits: 10
+  auto_compaction: true
+  compaction_interval: 3600
+  backup_enabled: true
+  backup_interval: 86400
+  backup_retention: 7
+  stats_enabled: true
+  stats_interval: 300
+
+# Wallet Configuration
+wallet:
+  wallet_type: "hd"
+  key_derivation: "bip44"
+  address_type: "bech32"
+  encryption: true
+  compression: true
+  passphrase: null
+  account_index: 0
+  change_index: 0
+  gap_limit: 20
+  auto_backup: true
+  backup_interval: 86400
+  price_alerts: false
+  transaction_fees:
+    low: 1
+    medium: 2
+    high: 5
+  multisig_config: null
+  hardware_wallet: null
+
+# Smart Contract Configuration
+smart_contract:
+  evm_version: "istanbul"
+  gas_limit: 8000000
+  gas_price: 1
+  max_contract_size: 24576
+  enable_optimizer: true
+  optimizer_runs: 200
+  allow_selfdestruct: false
+  allow_delegatecall: true
+  allow_create2: true
+  max_recursion_depth: 1024
+  contract_timeout: 30
+  enable_debugging: false
+  debug_port: 8545
+  allowed_opcodes:
+    - "STOP"
+    - "ADD"
+    - "MUL"
+    - "SUB"
+    - "DIV"
+    - "SDIV"
+    - "MOD"
+    - "SMOD"
+    - "ADDMOD"
+    - "MULMOD"
+    - "EXP"
+    - "SIGNEXTEND"
+    - "LT"
+    - "GT"
+    - "SLT"
+    - "SGT"
+    - "EQ"
+    - "ISZERO"
+    - "AND"
+    - "OR"
+    - "XOR"
+    - "NOT"
+    - "BYTE"
+    - "SHL"
+    - "SHR"
+    - "SAR"
+    - "SHA3"
+    - "ADDRESS"
+    - "BALANCE"
+    - "ORIGIN"
+    - "CALLER"
+    - "CALLVALUE"
+    - "CALLDATALOAD"
+    - "CALLDATASIZE"
+    - "CALLDATACOPY"
+    - "CODESIZE"
+    - "CODECOPY"
+    - "GASPRICE"
+    - "EXTCODESIZE"
+    - "EXTCODECOPY"
+    - "RETURNDATASIZE"
+    - "RETURNDATACOPY"
+    - "BLOCKHASH"
+    - "COINBASE"
+    - "TIMESTAMP"
+    - "NUMBER"
+    - "DIFFICULTY"
+    - "GASLIMIT"
+    - "POP"
+    - "MLOAD"
+    - "MSTORE"
+    - "MSTORE8"
+    - "SLOAD"
+    - "SSTORE"
+    - "JUMP"
+    - "JUMPI"
+    - "PC"
+    - "MSIZE"
+    - "GAS"
+    - "JUMPDEST"
+    - "PUSH1"
+    - "PUSH2"
+    - "PUSH32"
+    - "DUP1"
+    - "DUP16"
+    - "SWAP1"
+    - "SWAP16"
+    - "LOG0"
+    - "LOG4"
+    - "CREATE"
+    - "CALL"
+    - "CALLCODE"
+    - "RETURN"
+    - "DELEGATECALL"
+    - "CREATE2"
+    - "STATICCALL"
+    - "REVERT"
+    - "INVALID"
+
+# API Configuration
+api:
+  enabled: true
+  host: "0.0.0.0"
+  port: 8545
+  cors_domains:
+    - "*"
+  rate_limiting: true
+  rate_limit: 100
+  authentication: false
+  auth_tokens: []
+  ssl_enabled: false
+  ssl_cert: null
+  ssl_key: null
+  enable_websockets: true
+  websocket_port: 8546
+  max_connections: 100
+  request_timeout: 30
+  enable_metrics: true
+  metrics_port: 9090
+  enable_profiling: false
+  profiling_port: 6060
+
+# Logging Configuration
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file_enabled: true
+  file_path: "./logs/rayonix.log"
+  file_max_size: 104857600
+  file_backup_count: 10
+  console_enabled: true
+  syslog_enabled: false
+  syslog_address: null
+  syslog_facility: "local0"
+  enable_rotation: true
+  rotation_interval: 86400
+  compression: true
+  json_format: false
+  enable_tracing: false
+  trace_sample_rate: 0.1
+
+# Monitoring Configuration
+monitoring:
+  enabled: true
+  prometheus_enabled: true
+  prometheus_port: 9090
+  health_check_interval: 30
+  metrics_interval: 60
+  enable_alerting: true
+  alert_manager_url: null
+  enable_tracing: false
+  tracing_endpoint: null
+  enable_profiling: false
+  profiling_interval: 300
+  resource_monitoring: true
+  resource_interval: 60
+  performance_metrics: true
+  performance_interval: 30
+  log_metrics: true
+  log_interval: 300
+
+# Security Configuration
+security:
+  enable_encryption: true
+  encryption_algorithm: "aes-256-gcm"
+  key_derivation_iterations: 100000
+  enable_ssl: true
+  ssl_min_version: "TLSv1.2"
+  ssl_ciphers:
+    - "ECDHE-ECDSA-AES256-GCM-SHA384"
+    - "ECDHE-RSA-AES256-GCM-SHA384"
+    - "ECDHE-ECDSA-CHACHA20-POLY1305"
+    - "ECDHE-RSA-CHACHA20-POLY1305"
+  enable_firewall: true
+  firewall_rules: []
+  rate_limiting: true
+  rate_limit: 1000
+  enable_2fa: false
+  session_timeout: 3600
+  password_policy:
+    min_length: 12
+    require_uppercase: true
+    require_lowercase: true
+    require_numbers: true
+    require_special: true
+    max_age: 90
+    history: 5
+  audit_logging: true
+  audit_retention: 365
+
+# Cache Configuration
+cache:
+  enabled: true
+  type: "redis"
+  host: "localhost"
+  port: 6379
+  password: null
+  database: 0
+  max_memory: "1gb"
+  max_memory_policy: "allkeys-lru"
+  timeout: 300
+  compression: true
+  cluster_mode: false
+  sentinel_mode: false
+  sentinel_master: null
+  sentinel_nodes: []
+
+# Rate Limit Configuration
+rate_limit:
+  enabled: true
+  strategy: "fixed_window"
+  requests_per_second: 100
+  burst_capacity: 200
+  time_window: 60
+  by_ip: true
+  by_user: false
+  by_endpoint: true
+  exclude_ips: []
+  exclude_endpoints:
+    - "/health"
+    - "/metrics"
+
+# Cluster Configuration
+cluster:
+  enabled: false
+  mode: "standalone"
+  node_id: "node-1"
+  cluster_size: 3
+  discovery_method: "static"
+  discovery_config: {}
+  replication_factor: 3
+  quorum_size: 2
+  enable_auto_healing: true
+  healing_timeout: 30
+  enable_load_balancing: true
+  load_balancing_algorithm: "round_robin"
+
+# Backup Configuration
+backup:
+  enabled: true
+  strategy: "full"
+  interval: 86400
+  retention: 7
+  compression: true
+  encryption: true
+  storage_type: "local"
+  storage_config: {}
+  verify_backups: true
+  backup_verification_interval: 3600
+  enable_cloud_storage: false
+  cloud_provider: "aws"
+  cloud_config: {}
+
+# Metadata
+metadata:
+  version: "1.0.0"
+  created: 1757045866.123456
+  modified: 1757045866.123456
+  checksum: null
+  source: "FILE"
+  format: "YAML"
+  encrypted: false
+  encryption_method: "NONE"
+  signatures: {}

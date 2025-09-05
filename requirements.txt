@@ -1,0 +1,89 @@
+# Core Dependencies
+cryptography==41.0.7
+ecdsa==0.18.0
+base58==2.1.1
+bech32==1.2.0
+mnemonic==0.20
+bip32utils==0.3.post4
+pycryptodome==3.20.0
+
+# Database & Storage
+leveldb==0.203
+rocksdb==0.8.1
+plyvel==1.5.1
+msgpack==1.0.7
+pickle5==0.0.12
+
+# Networking & Web
+aiohttp==3.9.1
+websockets==12.0
+requests==2.31.0
+urllib3==2.0.7
+dnspython==2.4.2
+
+# Compression & Serialization
+zstandard==0.22.0
+lz4==4.3.3
+python-snappy==0.6.1
+zlib==1.0
+msgpack==1.0.7
+bencode.py==4.0.0
+
+# Utilities & Helpers
+pyqrcode==1.2.1
+pypng==0.20220715.0
+bloom-filter2==2.0.0
+crc32c==2.3
+numpy==1.25.2
+pandas==2.0.3
+
+# CLI & Interface
+click==8.1.7
+rich==13.7.0
+prompt-toolkit==3.0.39
+pygments==2.16.1
+readline==6.2.4.1
+
+# Testing & Development
+pytest==7.4.3
+pytest-asyncio==0.21.1
+pytest-cov==4.1.0
+hypothesis==6.92.6
+black==23.11.0
+flake8==6.1.0
+mypy==1.7.0
+bandit==1.7.6
+safety==2.3.5
+
+# Async & Concurrency
+asyncio==3.4.3
+concurrent-log-handler==0.9.20
+threadpoolctl==3.2.0
+
+# Documentation
+sphinx==7.2.6
+sphinx-rtd-theme==1.3.0
+myst-parser==2.0.0
+
+# Optional: Hardware Wallet Support
+ledgerblue==0.1.48
+trezor==0.13.8
+uhs-hsm==0.3.2
+
+# Optional: Advanced Cryptography
+pycryptodomex==3.20.0
+quantum-resistant==0.5.2
+zkp==1.2.0
+
+# Optional: Monitoring & Metrics
+prometheus-client==0.18.0
+grafana-client==3.5.0
+psutil==5.9.6
+
+# Optional: Docker & Deployment
+docker==6.1.3
+kubernetes==28.1.0
+gunicorn==21.2.0
+
+# Python Version
+python_version >= "3.9"
