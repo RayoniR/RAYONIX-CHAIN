@@ -76,7 +76,7 @@
 ‎
 ‎# Initialize blockchain
 ‎python main.py --network testnet --data-dir ./rayonix_data
-‎```
+‎
 
 
 ‎
@@ -84,16 +84,43 @@
 
 
 ‎
-‎rayonix-blockchain/
+‎RAYONIX-BLOCKCHAIN/
 ‎├── blockchain.py          # Core blockchain implementation
+
+
+
 ‎├── consensus.py           # Proof-of-Stake consensus
+
+
+
 ‎├── wallet.py              # HD wallet with multi-sig support
+
+
+
 ‎├── smart_contract.py      # EVM-compatible virtual machine
+
+
+
 ‎├── p2p_network.py         # P2P networking layer
+
+
+
 ‎├── database.py            # Persistent storage engine
+
+
+
 ‎├── utxo.py               # UTXO model implementation
+
+
+
 ‎├── merkle.py             # Merkle tree utilities
+
+
+
 ‎├── main.py               # CLI interface & orchestration
+
+
+
 ‎└── rayonix_coin.py       # RAYONIX coin implementation
 ‎
 
@@ -414,8 +441,14 @@
 ‎
 
 ‎- Discord: [ Join our community](https://discord.gg/rayonix)
+
+
 ‎- Twitter: [@rayonix_chain](https://twitter.com/rayonix_chain)
+
+
 ‎- Reddit: [/r/rayonix](https://reddit.com/r/rayonix)
+
+
 ‎- Documentation: [Read the docs](https://docs.rayonix.org)
 ‎
 
