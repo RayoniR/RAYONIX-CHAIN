@@ -186,8 +186,12 @@
 ‎""", initial_balance=0)
 ‎
 ‎ Configuration
+
+
 ‎
 ‎# Network Types
+
+
 ‎
 ‎yaml
 ‎mainnet:
@@ -196,21 +200,29 @@
 ‎  block_reward: 50
 ‎  halving_interval: 210000
 ‎
+
+
 ‎testnet:
 ‎  port: 30304
 ‎  bootnodes: ["testnet.rayonix.org:30304"]
 ‎  block_reward: 100
 ‎  halving_interval: 105000
 ‎
+
+
 ‎devnet:
 ‎  port: 30305
 ‎  bootnodes: []
 ‎  block_reward: 500
 ‎  halving_interval: 52500
-‎```
+‎
+
+
 ‎
 ‎Wallet Configuration
-‎```json
+
+
+‎json
 ‎{
 ‎  "wallet_type": "HD",
 ‎  "address_type": "RAYONIX",
@@ -220,7 +232,8 @@
 ‎  "gap_limit": 20,
 ‎  "auto_backup": true
 ‎}
-‎```
+‎
+
 ‎
 ‎ Performance
 
@@ -285,43 +298,62 @@
 ‎ API Documentation
 
 
+
+
 ‎
 ‎JSON-RPC Endpoints
 
-‎```bash
+‎bash
+
 ‎# Get block by height
 ‎curl -X POST http://localhost:8545 -H "Content-Type: application/json" \
 ‎  -d '{"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest", true],"id":1}'
 ‎
+
+
 ‎# Send transaction
+
+
 ‎curl -X POST http://localhost:8545 -H "Content-Type: application/json" \
 ‎  -d '{"jsonrpc":"2.0","method":"eth_sendTransaction","params":[{"from":"0x...","to":"0x...","value":"0x..."}],"id":1}'
 
 
 ‎
 ‎# Call contract
+
+
 ‎curl -X POST http://localhost:8545 -H "Content-Type: application/json" \
 ‎  -d '{"jsonrpc":"2.0","method":"eth_call","params":[{"to":"0x...","data":"0x..."},"latest"],"id":1}'
-‎```
+‎
+
 ‎
 ‎ Deployment
 
 
 ‎
 ‎Docker Deployment
-‎```dockerfile
+
+
+‎dockerfile
 ‎FROM python:3.9-slim
 ‎
+
+
 ‎WORKDIR /app
 ‎COPY . .
 ‎RUN pip install -r requirements.txt
 ‎
+
+
 ‎EXPOSE 30303 8545
 ‎CMD ["python", "main.py", "--network", "mainnet"]
-‎```
+‎
+
 ‎
 ‎Kubernetes Deployment
-‎```yaml
+
+
+‎yaml
 ‎apiVersion: apps/v1
 ‎kind: Deployment
 ‎metadata:
@@ -336,45 +368,68 @@
 ‎        ports:
 ‎        - containerPort: 30303
 ‎        - containerPort: 8545
-‎```
+
+
+
 ‎
 ‎ Contributing
+
+
 ‎
 ‎We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+
+
 ‎
 ‎1. Fork the repository
 ‎2. Create a feature branch (`git checkout -b feature/amazing-feature`)
 ‎3. Commit your changes (`git commit -m 'Add amazing feature'`)
 ‎4. Push to the branch (`git push origin feature/amazing-feature`)
 ‎5. Open a Pull Request
+
+
 ‎
-‎📜 License
+‎ License
+
+
 ‎
 ‎This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+
 ‎
-‎🛡️ Security
+‎ #Security
+
+
 ‎
 ‎If you discover any security vulnerabilities, please disclose them responsibly by emailing security@rayonix.org. We appreciate your help in making RAYONIX secure.
 ‎
-‎## 🌟 Star History
+‎
+
+# Star History
 ‎
 ‎[![Star History Chart](https://api.star-history.com/svg?repos=RayoniR/rayonix-blockchain&type=Date)](https://star-history.com/RayoniR/RAYONIX-BLOCKCHAIN&Date)
 ‎
-‎💬 Community
+
+
+‎# Community
 ‎
+
 ‎- Discord: [ Join our community](https://discord.gg/rayonix)
 ‎- Twitter: [@rayonix_chain](https://twitter.com/rayonix_chain)
 ‎- Reddit: [/r/rayonix](https://reddit.com/r/rayonix)
 ‎- Documentation: [Read the docs](https://docs.rayonix.org)
 ‎
-‎🏆 Acknowledgments
+
+
+‎# Acknowledgments
 ‎
+
+
 ‎- Bitcoin Core team for UTXO model inspiration
 ‎- Ethereum Foundation for EVM specification
 ‎- Tendermint team for BFT consensus research
 ‎- Cryptography researchers for advanced cryptographic primitives
 ‎
-‎---
+
 ‎
-‎RAYONIX - Building the future of decentralized finance, one block at a time. 🚀
+‎RAYONIX - Building the future of decentralized finance, one block at a time. 
 ‎
