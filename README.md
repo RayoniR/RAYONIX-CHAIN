@@ -2,15 +2,28 @@
 ‎
 ‎RAYONIX  is a complete, enterprise-grade blockchain implementation featuring Proof-of-Stake consensus, smart contracts, advanced wallet system, and peer-to-peer networking. Built from scratch in pure Python with zero external dependencies beyond cryptographic libraries.
 ‎
+
+
 ‎ Features
+
+
+
+
 ‎
 ‎Core Blockchain
 ‎- Proof-of-Stake Consensus- Energy-efficient validation with slashing mechanisms
 ‎- UTXO Model- Bitcoin-like transaction handling with advanced scripting
 ‎- Smart Contracts - EVM-compatible virtual machine with Solidity support
+
+
+
 ‎
 ‎- Merkle Trees- Efficient block verification with compact proofs
 ‎- Difficulty Adjustment- Dynamic difficulty based on network conditions
+
+
+
+
 ‎
 ‎Advanced Wallet System
 ‎- Hierarchical Deterministic (HD) - BIP32/39/44 compliant key generation
@@ -18,6 +31,10 @@
 ‎- Hardware Wallet Integration - Ledger/Trezor support with secure signing
 ‎- Address Diversity - P2PKH, P2SH, Bech32, and Ethereum-style addresses
 ‎- Military-Grade Encryption - AES-256 with proper key derivation
+
+
+
+
 ‎
 ‎Network Layer
 ‎- P2P Protocol - Decentralized gossip protocol with NAT traversal
@@ -25,6 +42,9 @@
 ‎- Encrypted Communication - TLS-like encryption for all network messages
 ‎- DHT Integration - Distributed hash table for peer discovery
 ‎- Sybil Protection - Peer reputation system with blacklisting
+
+
+
 ‎
 ‎Enterprise Features
 ‎- Database Persistence - LevelDB/RocksDB with compression and encryption
@@ -33,21 +53,36 @@
 ‎- Block Explorer - Complete blockchain query and analysis tools
 ‎- API Server - RESTful JSON-RPC API for external integration
 ‎
+
+
+
+
 ‎ Installation
+
+
+
 ‎
 ‎```bash
 ‎Clone repository
 ‎git clone https://github.com/RayoniR/RAYONIX-CHAIN.git
 ‎cd rayonix-blockchain
+
+
 ‎
 ‎Install dependencies
 ‎pip install -r requirements.txt
+
+
 ‎
 ‎# Initialize blockchain
 ‎python main.py --network testnet --data-dir ./rayonix_data
 ‎```
+
+
 ‎
 ‎ Architecture
+
+
 ‎
 ‎rayonix-blockchain/
 ‎├── blockchain.py          # Core blockchain implementation
@@ -61,52 +96,80 @@
 ‎├── main.py               # CLI interface & orchestration
 ‎└── rayonix_coin.py       # RAYONIX coin implementation
 ‎
+
+
+
 ‎
 ‎ Quick Start
+
+
 ‎
 ‎1. Create a Wallet
 ‎
+
+
+
 ‎python
 ‎from wallet import create_new_wallet
+
+
+
 ‎
 ‎Create HD wallet
 ‎wallet, mnemonic, xpub = create_new_wallet()
 ‎print(f"Mnemonic: {mnemonic}")
 ‎print(f"Master xpub: {xpub}")
-‎```
+‎
+
+
+
 ‎
 ‎2. Start a Node
 ‎
+
+
 ‎python
 ‎from rayonix_coin import RayonixCoin
+
+
 ‎
 ‎# Initialize blockchain
 ‎rayonix = RayonixCoin("testnet")
+
+
 ‎
 ‎#Connect to network and start staking
 ‎rayonix.connect_to_network()
 ‎rayonix.start_mining()
+
+
 ‎
 ‎
 ‎3. Create Transaction
 ‎
+
+
 ‎python
 ‎# Send RXY coins
 ‎transaction = rayonix.create_transaction(
-‎    from_address="rx1yourwalletaddress...",
-‎    to_address="rx1recipientaddress...",
+‎    from_address="rayonix1yourwalletaddress...",
+‎    to_address="rayonix1recipientaddress...",
 ‎    amount=1000000,  # 1.0 RXY
 ‎    fee=100          # 0.0001 RXY fee
 ‎)
-‎```
+‎
 ‎
 ‎4. Deploy Smart Contract
+
+
 ‎
 ‎python
 ‎# Deploy ERC20 token
 ‎contract_address = rayonix.deploy_contract("""
 ‎pragma solidity ^0.8.0;
 ‎
+
+
 ‎contract MyToken {
 ‎    mapping(address => uint256) public balances;
 ‎    
@@ -121,7 +184,6 @@
 ‎    }
 ‎}
 ‎""", initial_balance=0)
-‎```
 ‎
 ‎ Configuration
 ‎
@@ -160,15 +222,21 @@
 ‎}
 ‎```
 ‎
-‎📊 Performance
+‎ Performance
+
+
 ‎
 ‎- Block Time: 30 seconds target
 ‎- Transaction Throughput: 1000+ TPS
 ‎- Block Size: 4MB maximum
 ‎- Finality: 12 blocks (6 minutes)
 ‎- Consensus: Instant finality with BFT-style voting
+
+
 ‎
-‎🔒 Security Features
+‎ Security Features
+
+
 ‎
 ‎- Cryptographic Agility - Multiple signature algorithms supported
 ‎- Quantum Resistance - Optional post-quantum cryptography ready
@@ -177,9 +245,13 @@
 ‎- Audit Trail - Complete transaction history with non-repudiation
 ‎
 ‎ Network Statistics
+
+
 ‎
 ‎python
 ‎
+
+
 ‎# Get network info
 ‎info = rayonix.get_blockchain_info()
 ‎print(f"Block Height: {info['height']}")
@@ -188,8 +260,12 @@
 ‎print(f"Active Validators: {info['validators']}")
 ‎print(f"Network Difficulty: {info['difficulty']}")
 ‎```
+
+
 ‎
 ‎ Testing
+
+
 ‎
 ‎```bash
 ‎# Run unit tests
@@ -207,8 +283,11 @@
 ‎```
 ‎
 ‎ API Documentation
+
+
 ‎
 ‎JSON-RPC Endpoints
+
 ‎```bash
 ‎# Get block by height
 ‎curl -X POST http://localhost:8545 -H "Content-Type: application/json" \
@@ -217,6 +296,8 @@
 ‎# Send transaction
 ‎curl -X POST http://localhost:8545 -H "Content-Type: application/json" \
 ‎  -d '{"jsonrpc":"2.0","method":"eth_sendTransaction","params":[{"from":"0x...","to":"0x...","value":"0x..."}],"id":1}'
+
+
 ‎
 ‎# Call contract
 ‎curl -X POST http://localhost:8545 -H "Content-Type: application/json" \
@@ -224,6 +305,8 @@
 ‎```
 ‎
 ‎ Deployment
+
+
 ‎
 ‎Docker Deployment
 ‎```dockerfile
@@ -275,7 +358,7 @@
 ‎
 ‎## 🌟 Star History
 ‎
-‎[![Star History Chart](https://api.star-history.com/svg?repos=RayoniR/rayonix-blockchain&type=Date)](https://star-history.com/RayoniR/rayonix-blockchain&Date)
+‎[![Star History Chart](https://api.star-history.com/svg?repos=RayoniR/rayonix-blockchain&type=Date)](https://star-history.com/RayoniR/RAYONIX-BLOCKCHAIN&Date)
 ‎
 ‎💬 Community
 ‎
