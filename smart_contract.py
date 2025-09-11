@@ -12,7 +12,6 @@ from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.exceptions import InvalidSignature
 from enum import Enum, auto
 from dataclasses import dataclass, field
-import leveldb
 import plyvel
 import threading
 from concurrent.futures import ThreadPoolExecutor
@@ -514,337 +513,262 @@ def {func_name}({', '.join(params)}):
         contract.admins = set(data['admins'])
         contract.blacklisted = set(data['blacklisted'])
         
+        # Load gas config
         contract.gas_limit = data['gas_limit']
         contract.gas_price = data['gas_price']
-        contract.events = data['events']
         
-        # Reinitialize functions from bytecode
+        # Load events
+        contract.events = data.get('events', [])
+        
+        # Reinitialize functions
         contract._initialize_contract()
         
         return contract
 
 class ContractManager:
-    """Manager for smart contracts with persistence and advanced features"""
+    """Manages deployment and interaction with smart contracts"""
     
-    def __init__(self, db_path: str = './contract_db'):
+    def __init__(self, db_path: str = './contracts_db'):
+        self.db_path = db_path
+        self.db = plyvel.DB(db_path, create_if_missing=True)
         self.contracts: Dict[str, SmartContract] = {}
-        self.contract_index: Dict[str, List[str]] = defaultdict(list)  # creator -> contract_addresses
-        self.type_index: Dict[ContractType, List[str]] = defaultdict(list)
-        
-        self.db = leveldb.LevelDB(db_path)
         self.lock = threading.RLock()
         self.executor = ThreadPoolExecutor(max_workers=10)
         
+        # Load existing contracts
         self._load_contracts()
     
     def _load_contracts(self):
         """Load contracts from database"""
-        try:
-            contracts_data = pickle.loads(self.db.Get(b'contracts'))
-            self.contracts = {addr: SmartContract.from_dict(data) 
-                             for addr, data in contracts_data.items()}
-            
-            # Rebuild indexes
-            for address, contract in self.contracts.items():
-                self.contract_index[contract.creator].append(address)
-                self.type_index[contract.contract_type].append(address)
-                
-        except KeyError:
-            # Fresh database
-            pass
-    
-    def _save_contracts(self):
-        """Save contracts to database"""
         with self.lock:
-            contracts_data = {addr: contract.to_dict() 
-                             for addr, contract in self.contracts.items()}
-            self.db.Put(b'contracts', pickle.dumps(contracts_data))
+            try:
+                for key, value in self.db:
+                    if key.startswith(b'contract_'):
+                        try:
+                            contract_data = pickle.loads(value)
+                            contract = SmartContract.from_dict(contract_data)
+                            self.contracts[contract.contract_address] = contract
+                        except Exception as e:
+                            print(f"Error loading contract {key}: {e}")
+            except Exception as e:
+                print(f"Error loading contracts: {e}")
     
     def deploy_contract(self, creator: str, bytecode: str, 
                        contract_type: ContractType = ContractType.CUSTOM,
                        initial_balance: int = 0) -> str:
-        """
-        Deploy a new smart contract
+        """Deploy a new smart contract"""
+        contract_address = self._generate_contract_address(creator, bytecode)
         
-        Args:
-            creator: Address of contract creator
-            bytecode: Contract bytecode
-            contract_type: Type of contract
-            initial_balance: Initial balance to fund contract
-        
-        Returns:
-            Contract address
-        """
         with self.lock:
-            # Generate contract address
-            contract_address = self._generate_contract_address(creator, bytecode)
-            
             if contract_address in self.contracts:
-                raise ValueError("Contract already deployed")
+                raise ValueError("Contract already exists")
             
-            # Create contract
             contract = SmartContract(contract_address, creator, bytecode, contract_type)
             contract.balance = initial_balance
             
             # Store contract
             self.contracts[contract_address] = contract
-            self.contract_index[creator].append(contract_address)
-            self.type_index[contract_type].append(contract_address)
-            
-            self._save_contracts()
+            self._save_contract(contract)
             
             return contract_address
     
     def _generate_contract_address(self, creator: str, bytecode: str) -> str:
-        """Generate deterministic contract address"""
-        unique_data = f"{creator}{bytecode}{len(self.contracts)}"
-        hash_result = hashlib.sha256(unique_data.encode()).hexdigest()
-        return f"0x{hash_result[:40]}"
+        """Generate unique contract address"""
+        hash_input = f"{creator}{bytecode}{time.time()}".encode()
+        return hashlib.sha256(hash_input).hexdigest()[:40]
     
-    def execute_contract(self, contract_address: str, function_name: str,
-                        args: List[Any], caller: str, value: int = 0) -> ExecutionResult:
-        """
-        Execute a contract function
-        
-        Args:
-            contract_address: Address of contract
-            function_name: Name of function to execute
-            args: Function arguments
-            caller: Address of caller
-            value: Value to send with call
-        
-        Returns:
-            Execution result
-        """
-        if contract_address not in self.contracts:
-            return ExecutionResult(False, error="Contract not found")
-        
-        contract = self.contracts[contract_address]
-        result = contract.execute_function(function_name, args, caller, value)
-        
-        if result.success:
-            self._save_contracts()
-        
-        return result
-    
-    def call_contract(self, contract_address: str, function_name: str,
-                     args: List[Any], caller: str) -> ExecutionResult:
-        """Call contract function without state changes"""
-        if contract_address not in self.contracts:
-            return ExecutionResult(False, error="Contract not found")
-        
-        contract = self.contracts[contract_address]
-        return contract.call_function(function_name, args, caller)
-    
-    def get_contract(self, contract_address: str) -> Optional[SmartContract]:
-        """Get contract by address"""
-        return self.contracts.get(contract_address)
-    
-    def get_contracts_by_creator(self, creator: str) -> List[SmartContract]:
-        """Get all contracts created by an address"""
-        addresses = self.contract_index.get(creator, [])
-        return [self.contracts[addr] for addr in addresses if addr in self.contracts]
-    
-    def get_contracts_by_type(self, contract_type: ContractType) -> List[SmartContract]:
-        """Get all contracts of specific type"""
-        addresses = self.type_index.get(contract_type, [])
-        return [self.contracts[addr] for addr in addresses if addr in self.contracts]
-    
-    def upgrade_contract(self, contract_address: str, new_bytecode: str, upgrador: str) -> bool:
-        """Upgrade a contract"""
-        if contract_address not in self.contracts:
-            return False
-        
-        contract = self.contracts[contract_address]
-        success = contract.upgrade_contract(new_bytecode, upgrador)
-        
-        if success:
-            self._save_contracts()
-        
-        return success
-    
-    def destroy_contract(self, contract_address: str, destroyer: str) -> bool:
-        """Destroy a contract"""
-        if contract_address not in self.contracts:
-            return False
-        
-        contract = self.contracts[contract_address]
-        success = contract.destroy_contract(destroyer)
-        
-        if success:
-            # Remove from indexes
-            self.contract_index[contract.creator].remove(contract_address)
-            self.type_index[contract.contract_type].remove(contract_address)
-            del self.contracts[contract_address]
+    def execute_contract(self, contract_address: str, function_name: str, 
+                        args: List[Any], caller: str, value: int = 0, 
+                        gas_limit: int = None) -> ExecutionResult:
+        """Execute a contract function"""
+        with self.lock:
+            if contract_address not in self.contracts:
+                return ExecutionResult(False, error="Contract not found")
             
-            self._save_contracts()
-        
-        return success
+            contract = self.contracts[contract_address]
+            result = contract.execute_function(function_name, args, caller, value, gas_limit)
+            
+            if result.success:
+                self._save_contract(contract)
+            
+            return result
+    
+    def call_contract(self, contract_address: str, function_name: str, 
+                     args: List[Any], caller: str) -> ExecutionResult:
+        """Call a contract function (read-only)"""
+        with self.lock:
+            if contract_address not in self.contracts:
+                return ExecutionResult(False, error="Contract not found")
+            
+            contract = self.contracts[contract_address]
+            return contract.call_function(function_name, args, caller)
     
     def get_contract_balance(self, contract_address: str) -> int:
         """Get contract balance"""
-        if contract_address not in self.contracts:
-            return 0
-        return self.contracts[contract_address].balance
+        with self.lock:
+            if contract_address not in self.contracts:
+                return 0
+            
+            return self.contracts[contract_address].balance
     
-    def transfer_to_contract(self, contract_address: str, from_address: str, 
-                           amount: int) -> bool:
-        """Transfer funds to contract"""
-        if contract_address not in self.contracts:
-            return False
-        
-        # In real implementation, would check sender balance first
-        self.contracts[contract_address].balance += amount
-        self._save_contracts()
-        return True
+    def get_contract_state(self, contract_address: str) -> ContractState:
+        """Get contract state"""
+        with self.lock:
+            if contract_address not in self.contracts:
+                return ContractState.DESTROYED
+            
+            return self.contracts[contract_address].state
+    
+    def upgrade_contract(self, contract_address: str, new_bytecode: str, 
+                        upgrador: str) -> bool:
+        """Upgrade a contract"""
+        with self.lock:
+            if contract_address not in self.contracts:
+                return False
+            
+            contract = self.contracts[contract_address]
+            success = contract.upgrade_contract(new_bytecode, upgrador)
+            
+            if success:
+                self._save_contract(contract)
+            
+            return success
+    
+    def destroy_contract(self, contract_address: str, destroyer: str) -> bool:
+        """Destroy a contract"""
+        with self.lock:
+            if contract_address not in self.contracts:
+                return False
+            
+            contract = self.contracts[contract_address]
+            success = contract.destroy_contract(destroyer)
+            
+            if success:
+                # Remove from memory and database
+                del self.contracts[contract_address]
+                self.db.delete(f'contract_{contract_address}'.encode())
+            
+            return success
+    
+    def _save_contract(self, contract: SmartContract):
+        """Save contract to database"""
+        try:
+            contract_data = pickle.dumps(contract.to_dict())
+            self.db.put(f'contract_{contract.contract_address}'.encode(), contract_data)
+        except Exception as e:
+            print(f"Error saving contract {contract.contract_address}: {e}")
     
     def get_contract_events(self, contract_address: str, event_name: str = None, 
-                          limit: int = 100) -> List[Dict]:
-        """Get events from contract"""
-        if contract_address not in self.contracts:
-            return []
-        
-        return self.contracts[contract_address].get_events(event_name, limit)
+                           limit: int = 100) -> List[Dict]:
+        """Get events from a contract"""
+        with self.lock:
+            if contract_address not in self.contracts:
+                return []
+            
+            return self.contracts[contract_address].get_events(event_name, limit)
     
-    def batch_execute(self, executions: List[Tuple[str, str, List, str, int]]) -> List[ExecutionResult]:
-        """Execute multiple contract calls in batch"""
-        results = []
-        for contract_address, function_name, args, caller, value in executions:
-            result = self.execute_contract(contract_address, function_name, args, caller, value)
-            results.append(result)
-        return results
-
-# Standard contract templates
-class StandardContracts:
-    """Standard contract implementations"""
-    
-    @staticmethod
-    def create_erc20_template(name: str, symbol: str, initial_supply: int) -> str:
-        """Create ERC20 token contract template"""
-        return json.dumps({
-            'type': 'ERC20',
-            'config': {
-                'name': name,
-                'symbol': symbol,
-                'decimals': 18,
-                'total_supply': initial_supply
-            },
-            'functions': {
-                'transfer': {
-                    'params': ['to', 'amount'],
-                    'code': f"""
-    if amount <= self.storage.get('balances', {{}}).get('caller', 0):
-        balances = self.storage.get('balances', {{}})
-        balances['caller'] = balances.get('caller', 0) - amount
-        balances[to] = balances.get(to, 0) + amount
-        self.storage.set('balances', balances, 'caller')
-        self.emit_event('Transfer', from_addr='caller', to_addr=to, amount=amount)
-        return True
-    return False
-    """
-                },
-                'balanceOf': {
-                    'params': ['owner'],
-                    'code': "return self.storage.get('balances', {}).get(owner, 0)"
-                }
-            },
-            'storage': {
-                'balances': {'creator': initial_supply},
-                'allowed': {}
+    def get_contract_info(self, contract_address: str) -> Optional[Dict]:
+        """Get contract information"""
+        with self.lock:
+            if contract_address not in self.contracts:
+                return None
+            
+            contract = self.contracts[contract_address]
+            return {
+                'address': contract.contract_address,
+                'creator': contract.creator,
+                'type': contract.contract_type.name,
+                'balance': contract.balance,
+                'state': contract.state.name,
+                'created_at': contract.created_at,
+                'execution_count': contract.execution_count,
+                'gas_used_total': contract.gas_used_total,
+                'owners': list(contract.owners),
+                'admins': list(contract.admins)
             }
-        })
     
-    @staticmethod
-    def create_erc721_template(name: str, symbol: str) -> str:
-        """Create ERC721 NFT contract template"""
-        return json.dumps({
-            'type': 'ERC721',
-            'config': {
-                'name': name,
-                'symbol': symbol
-            },
-            'functions': {
-                'mint': {
-                    'params': ['to', 'token_id'],
-                    'code': f"""
-    owners = self.storage.get('owners', {{}})
-    if token_id in owners:
-        return False
-    owners[token_id] = to
-    self.storage.set('owners', owners, 'caller')
-    self.emit_event('Transfer', from_addr='0x0', to_addr=to, token_id=token_id)
-    return True
-    """
-                },
-                'ownerOf': {
-                    'params': ['token_id'],
-                    'code': "return self.storage.get('owners', {}).get(token_id, '0x0')"
-                }
-            },
-            'storage': {
-                'owners': {},
-                'approvals': {}
-            }
-        })
+    def __del__(self):
+        """Cleanup on destruction"""
+        try:
+            self.db.close()
+            self.executor.shutdown()
+        except:
+            pass
 
-# Gas metering system
-class GasMeter:
-    """Gas metering for contract execution"""
+# Example usage and demonstration
+def demonstrate_contract_system():
+    """Demonstrate the smart contract system"""
     
-    def __init__(self, gas_limit: int, gas_price: int):
-        self.gas_limit = gas_limit
-        self.gas_price = gas_price
-        self.gas_used = 0
-        self.opcode_costs = {
-            'STORAGE_READ': 100,
-            'STORAGE_WRITE': 500,
-            'COMPUTATION': 10,
-            'EVENT_EMIT': 100,
-            'CONTRACT_CALL': 700
-        }
-    
-    def use_gas(self, amount: int, opcode: str = 'COMPUTATION'):
-        """Use gas for operation"""
-        self.gas_used += amount
-        if self.gas_used > self.gas_limit:
-            raise OutOfGasError(f"Out of gas: {self.gas_used}/{self.gas_limit}")
-    
-    def get_gas_cost(self, opcode: str) -> int:
-        """Get gas cost for opcode"""
-        return self.opcode_costs.get(opcode, 10)
-
-class OutOfGasError(Exception):
-    """Exception for out of gas conditions"""
-    pass
-
-# Example usage
-if __name__ == "__main__":
-    # Test contract system
+    # Initialize contract manager
     manager = ContractManager()
     
-    # Deploy ERC20 contract
-    erc20_bytecode = StandardContracts.create_erc20_template("TestToken", "TEST", 1000000)
-    contract_address = manager.deploy_contract("creator_address", erc20_bytecode, ContractType.ERC20)
+    # Sample ERC20-like token contract
+    token_bytecode = """
+function transfer(to, amount):
+    balance_sender = storage.get('balance_' + caller, 0)
+    balance_receiver = storage.get('balance_' + to, 0)
     
-    print(f"Contract deployed at: {contract_address}")
+    if balance_sender >= amount:
+        storage.set('balance_' + caller, balance_sender - amount, caller)
+        storage.set('balance_' + to, balance_receiver + amount, caller)
+        emit_event('Transfer', from=caller, to=to, amount=amount)
+        return True
+    return False
+
+function balanceOf(owner):
+    return storage.get('balance_' + owner, 0)
+
+function mint(amount):
+    # Only owner can mint
+    if caller not in self.owners:
+        return False
     
-    # Execute contract function
-    result = manager.execute_contract(
-        contract_address, 
-        "transfer", 
-        ["recipient_address", 100], 
-        "caller_address"
-    )
+    current_balance = storage.get('balance_' + caller, 0)
+    storage.set('balance_' + caller, current_balance + amount, caller)
+    emit_event('Mint', to=caller, amount=amount)
+    return True
+"""
     
-    print(f"Transfer result: {result.success}")
-    print(f"Gas used: {result.gas_used}")
-    
-    # Call view function
-    balance_result = manager.call_contract(
-        contract_address,
-        "balanceOf",
-        ["creator_address"],
-        "caller_address"
-    )
-    
-    print(f"Creator balance: {balance_result.return_value}")
+    try:
+        # Deploy contract
+        creator = "0x742d35Cc6634C0532925a3b844Bc454e4438f44e"
+        contract_address = manager.deploy_contract(creator, token_bytecode, ContractType.ERC20)
+        
+        print(f"Contract deployed at: {contract_address}")
+        
+        # Mint some tokens
+        mint_result = manager.execute_contract(
+            contract_address, "mint", [1000], creator
+        )
+        
+        print(f"Mint result: {mint_result.success}")
+        
+        # Check balance
+        balance_result = manager.call_contract(
+            contract_address, "balanceOf", [creator], creator
+        )
+        
+        print(f"Creator balance: {balance_result.return_value}")
+        
+        # Transfer tokens
+        recipient = "0x742d35Cc6634C0532925a3b844Bc454e4438f44f"
+        transfer_result = manager.execute_contract(
+            contract_address, "transfer", [recipient, 100], creator
+        )
+        
+        print(f"Transfer result: {transfer_result.success}")
+        
+        # Check events
+        events = manager.get_contract_events(contract_address)
+        print(f"Contract events: {len(events)}")
+        
+        # Get contract info
+        info = manager.get_contract_info(contract_address)
+        print(f"Contract info: {info}")
+        
+    except Exception as e:
+        print(f"Error in demonstration: {e}")
+        traceback.print_exc()
+
+if __name__ == "__main__":
+    demonstrate_contract_system()
