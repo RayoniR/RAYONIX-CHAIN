@@ -1,6 +1,4 @@
 # database.py
-import plyvel as leveldb
-import rocksdb
 import plyvel
 import pickle
 import json
@@ -28,8 +26,6 @@ from bloom_filter import BloomFilter
 import crc32c
 
 class DatabaseType(Enum):
-    LEVELDB = auto()
-    ROCKSDB = auto()
     PLYVEL = auto()
     MEMORY = auto()
 
@@ -55,7 +51,7 @@ class IndexType(Enum):
 @dataclass
 class DatabaseConfig:
     """Database configuration"""
-    db_type: DatabaseType = DatabaseType.LEVELDB
+    db_type: DatabaseType = DatabaseType.PLYVEL
     compression: CompressionType = CompressionType.SNAPPY
     encryption: EncryptionType = EncryptionType.FERNET
     create_if_missing: bool = True
@@ -88,7 +84,7 @@ class BatchOperation:
     ttl: Optional[int] = None  # Time-to-live in seconds
 
 class AdvancedDatabase:
-    """Advanced database layer with multiple backends, encryption, and compression"""
+    """Advanced database layer with plyvel backend, encryption, and compression"""
     
     def __init__(self, db_path: str, config: Optional[DatabaseConfig] = None):
         self.db_path = db_path
@@ -112,28 +108,18 @@ class AdvancedDatabase:
         """Initialize the database backend"""
         Path(self.db_path).mkdir(parents=True, exist_ok=True)
         
-        if self.config.db_type == DatabaseType.LEVELDB:
-            import leveldb
-            self.db = leveldb.LevelDB(self.db_path, 
-                                     create_if_missing=self.config.create_if_missing,
-                                     error_if_exists=self.config.error_if_exists,
-                                     paranoid_checks=self.config.paranoid_checks)
-        
-        elif self.config.db_type == DatabaseType.ROCKSDB:
-            import rocksdb
-            options = rocksdb.Options()
+        if self.config.db_type == DatabaseType.PLYVEL:
+            # Configure plyvel options
+            options = plyvel.Options()
             options.create_if_missing = self.config.create_if_missing
+            options.error_if_exists = self.config.error_if_exists
+            options.paranoid_checks = self.config.paranoid_checks
             options.write_buffer_size = self.config.write_buffer_size
             options.max_open_files = self.config.max_open_files
-            options.target_file_size_base = 64 * 1024 * 1024
-            options.max_bytes_for_level_base = 512 * 1024 * 1024
-            self.db = rocksdb.DB(self.db_path, options)
-        
-        elif self.config.db_type == DatabaseType.PLYVEL:
-            import plyvel
-            self.db = plyvel.DB(self.db_path, 
-                               create_if_missing=self.config.create_if_missing,
-                               error_if_exists=self.config.error_if_exists)
+            options.block_size = self.config.block_size
+            options.lru_cache_size = self.config.cache_size
+            
+            self.db = plyvel.DB(self.db_path, options=options)
         
         elif self.config.db_type == DatabaseType.MEMORY:
             self.db = {}
@@ -244,11 +230,7 @@ class AdvancedDatabase:
                 if self.config.db_type == DatabaseType.MEMORY:
                     self.db[key_bytes] = serialized_value
                 else:
-                    if hasattr(self.db, 'put'):
-                        self.db.put(key_bytes, serialized_value)
-                    else:
-                        # LevelDB compatibility
-                        self.db.Put(key_bytes, serialized_value)
+                    self.db.put(key_bytes, serialized_value, sync=True)
                 
                 # Update cache
                 if use_cache:
@@ -293,14 +275,7 @@ class AdvancedDatabase:
                 if self.config.db_type == DatabaseType.MEMORY:
                     serialized_value = self.db.get(key_bytes)
                 else:
-                    if hasattr(self.db, 'get'):
-                        serialized_value = self.db.get(key_bytes)
-                    else:
-                        # LevelDB compatibility
-                        try:
-                            serialized_value = self.db.Get(key_bytes)
-                        except KeyError:
-                            serialized_value = None
+                    serialized_value = self.db.get(key_bytes)
                 
                 if serialized_value is None:
                     self.stats.misses += 1
@@ -359,14 +334,7 @@ class AdvancedDatabase:
                     else:
                         return False
                 else:
-                    if hasattr(self.db, 'delete'):
-                        self.db.delete(key_bytes)
-                    else:
-                        # LevelDB compatibility
-                        try:
-                            self.db.Delete(key_bytes)
-                        except KeyError:
-                            return False
+                    self.db.delete(key_bytes)
                 
                 # Update cache
                 if use_cache and key_bytes in self.cache:
@@ -395,13 +363,7 @@ class AdvancedDatabase:
         """
         with self.lock:
             try:
-                if self.config.db_type == DatabaseType.LEVELDB:
-                    batch = leveldb.WriteBatch()
-                elif self.config.db_type == DatabaseType.ROCKSDB:
-                    batch = rocksdb.WriteBatch()
-                elif self.config.db_type == DatabaseType.PLYVEL:
-                    batch = self.db.write_batch()
-                else:
+                if self.config.db_type == DatabaseType.MEMORY:
                     # For memory DB, execute operations sequentially
                     for op in operations:
                         if op.op_type == 'put':
@@ -411,26 +373,21 @@ class AdvancedDatabase:
                                 del self.db[op.key]
                     return True
                 
-                for op in operations:
-                    if op.op_type == 'put':
-                        value = self._prepare_value_for_storage(op.value, op.ttl)
-                        batch.Put(op.key, value)
-                    elif op.op_type == 'delete':
-                        batch.Delete(op.key)
-                    elif op.op_type == 'merge':
-                        # Merge operation (requires special handling)
-                        current = self.get(op.key, use_cache=False, check_ttl=False)
-                        if current is not None:
-                            merged = self._merge_values(current, op.value)
-                            value = self._prepare_value_for_storage(merged, op.ttl)
-                            batch.Put(op.key, value)
-                
-                if self.config.db_type == DatabaseType.LEVELDB:
-                    self.db.Write(batch, sync=True)
-                elif self.config.db_type == DatabaseType.ROCKSDB:
-                    self.db.write(batch)
-                elif self.config.db_type == DatabaseType.PLYVEL:
-                    batch.write()
+                # For plyvel, use write batch
+                with self.db.write_batch() as batch:
+                    for op in operations:
+                        if op.op_type == 'put':
+                            value = self._prepare_value_for_storage(op.value, op.ttl)
+                            batch.put(op.key, value)
+                        elif op.op_type == 'delete':
+                            batch.delete(op.key)
+                        elif op.op_type == 'merge':
+                            # Merge operation (requires special handling)
+                            current = self.get(op.key, use_cache=False, check_ttl=False)
+                            if current is not None:
+                                merged = self._merge_values(current, op.value)
+                                value = self._prepare_value_for_storage(merged, op.ttl)
+                                batch.put(op.key, value)
                 
                 self.stats.batch_operations += 1
                 return True
@@ -458,19 +415,16 @@ class AdvancedDatabase:
                     for key in keys:
                         if prefix is None or key.startswith(prefix):
                             yield key, self.db[key]
-                
-                elif self.config.db_type == DatabaseType.LEVELDB:
-                    iterator = self.db.RangeIter(prefix=prefix, reverse=reverse)
-                    for key, value in iterator:
-                        yield key, self._deserialize_value(value)
-                
-                elif self.config.db_type == DatabaseType.ROCKSDB:
-                    it = self.db.iteritems()
+                else:
+                    # Plyvel iteration
                     if prefix:
-                        it.seek(prefix)
+                        # Use prefix iterator
+                        it = self.db.iterator(prefix=prefix, reverse=reverse)
+                    else:
+                        # Full range iterator
+                        it = self.db.iterator(reverse=reverse)
+                    
                     for key, value in it:
-                        if prefix and not key.startswith(prefix):
-                            break
                         yield key, self._deserialize_value(value)
                 
                 self.stats.iterate_operations += 1
@@ -541,19 +495,14 @@ class AdvancedDatabase:
     def create_snapshot(self, snapshot_path: str) -> bool:
         """Create database snapshot"""
         try:
-            if self.config.db_type == DatabaseType.LEVELDB:
-                # LevelDB doesn't have native snapshots, create copy
+            if self.config.db_type == DatabaseType.PLYVEL:
+                # Plyvel doesn't have native snapshots, create copy
                 import shutil
                 shutil.copytree(self.db_path, snapshot_path)
-            elif self.config.db_type == DatabaseType.ROCKSDB:
-                # RocksDB has snapshot support
-                snapshot = self.db.snapshot()
-                # Would need to implement snapshot serialization
-            elif self.config.db_type == DatabaseType.PLYVEL:
-                # Plyvel snapshots
-                with self.db.snapshot() as snapshot:
-                    # Implement snapshot export
-                    pass
+            elif self.config.db_type == DatabaseType.MEMORY:
+                # For memory DB, serialize to disk
+                with open(snapshot_path, 'wb') as f:
+                    pickle.dump(self.db, f)
             
             return True
         except Exception as e:
@@ -562,8 +511,26 @@ class AdvancedDatabase:
     def compact(self) -> bool:
         """Compact database"""
         try:
-            if hasattr(self.db, 'CompactRange'):
-                self.db.CompactRange()
+            if self.config.db_type == DatabaseType.PLYVEL:
+                # Plyvel doesn't have explicit compaction, but we can force it
+                # by rewriting the database
+                compact_path = self.db_path + "_compact"
+                compact_db = plyvel.DB(compact_path, create_if_missing=True)
+                
+                # Copy all data
+                with compact_db.write_batch() as batch:
+                    for key, value in self.db.iterator():
+                        batch.put(key, value)
+                
+                # Replace original database
+                self.db.close()
+                import shutil
+                shutil.rmtree(self.db_path)
+                shutil.move(compact_path, self.db_path)
+                
+                # Reopen database
+                self._initialize_database()
+            
             return True
         except Exception as e:
             raise DatabaseError(f"Compaction failed: {e}")
@@ -691,6 +658,15 @@ class AdvancedDatabase:
         """Log database statistics"""
         stats = self.get_stats()
         print(f"Database Stats: {stats}")
+
+    def close(self):
+        """Close database connection"""
+        if self.db and hasattr(self.db, 'close'):
+            self.db.close()
+
+    def __del__(self):
+        """Cleanup on destruction"""
+        self.close()
 
 # Index implementations
 class BTreeIndex:
@@ -856,39 +832,43 @@ def transaction(db: AdvancedDatabase):
 if __name__ == "__main__":
     # Test database
     config = DatabaseConfig(
-        db_type=DatabaseType.LEVELDB,
+        db_type=DatabaseType.PLYVEL,
         compression=CompressionType.SNAPPY,
         encryption=EncryptionType.FERNET
     )
     
     db = AdvancedDatabase("./test_db", config)
     
-    # Store data
-    db.put("key1", {"name": "test", "value": 42})
-    db.put("key2", "hello world")
-    db.put("key3", [1, 2, 3, 4, 5])
+    try:
+        # Store data
+        db.put("key1", {"name": "test", "value": 42})
+        db.put("key2", "hello world")
+        db.put("key3", [1, 2, 3, 4, 5])
+        
+        # Retrieve data
+        value1 = db.get("key1")
+        value2 = db.get("key2")
+        value3 = db.get("key3")
+        
+        print(f"Value1: {value1}")
+        print(f"Value2: {value2}")
+        print(f"Value3: {value3}")
+        
+        # Batch operations
+        operations = [
+            BatchOperation('put', b'batch1', b'value1'),
+            BatchOperation('put', b'batch2', b'value2'),
+            BatchOperation('delete', b'key1')
+        ]
+        db.batch_write(operations)
+        
+        # Iterate through keys
+        for key, value in db.iterate():
+            print(f"Key: {key}, Value: {value}")
+        
+        # Get statistics
+        stats = db.get_stats()
+        print(f"Database statistics: {stats}")
     
-    # Retrieve data
-    value1 = db.get("key1")
-    value2 = db.get("key2")
-    value3 = db.get("key3")
-    
-    print(f"Value1: {value1}")
-    print(f"Value2: {value2}")
-    print(f"Value3: {value3}")
-    
-    # Batch operations
-    operations = [
-        BatchOperation('put', b'batch1', b'value1'),
-        BatchOperation('put', b'batch2', b'value2'),
-        BatchOperation('delete', b'key1')
-    ]
-    db.batch_write(operations)
-    
-    # Iterate through keys
-    for key, value in db.iterate():
-        print(f"Key: {key}, Value: {value}")
-    
-    # Get statistics
-    stats = db.get_stats()
-    print(f"Database statistics: {stats}")
+    finally:
+        db.close()
