@@ -62,6 +62,7 @@ class AddressType(Enum):
     P2TR = auto()        # Pay to Taproot (Taproot)
     BECH32 = auto()      # Bech32 addresses
     ETHEREUM = auto()    # Ethereum-style addresses
+    RAYONIX = auto()  #Rayonix-style addresses
     CONTRACT = auto()    # Smart contract addresses
 
 @dataclass
@@ -69,7 +70,7 @@ class WalletConfig:
     """Wallet configuration"""
     wallet_type: WalletType = WalletType.HD
     key_derivation: KeyDerivation = KeyDerivation.BIP44
-    address_type: AddressType = AddressType.BECH32
+    address_type: AddressType = AddressType.RAYONIX  #P2SH  #P2WPKH  #P2WSH  #BECH32
     encryption: bool = True
     compression: bool = True
     passphrase: Optional[str] = None
@@ -520,6 +521,8 @@ class AdvancedWallet:
             return self._public_key_to_bech32(public_key)
         elif self.config.address_type == AddressType.ETHEREUM:
             return self._public_key_to_ethereum(public_key)
+        elif self.config.address_type == AddressType.RAYONIX:
+        	return self._public_key_to_rayonix(public_key)
         else:
             return self._public_key_to_p2pkh(public_key)  # Default
     
@@ -562,6 +565,13 @@ class AdvancedWallet:
         
         hrp = "bc" if self.config.network == "mainnet" else "tb"
         return bech32.encode(hrp, 0, ripemd160)
+        
+    def _public_key_to_rayonix(self, public_key: bytes) -> str:
+    	sha256 = hashlib.sha256(public_key).digest()
+    	ripemd160 = hashlib.new("ripemd160", sha256).digest()
+    	hrp = "ryx" if self.config.network == "mainnet" else "tstx"  # tstx = testnet
+    	data = bech32.convertbits(ripemd160, 8, 5)  # convert 8-bit -> 5-bit
+    	return bech32.bech32_encode(hrp, data)
     
     def _public_key_to_ethereum(self, public_key: bytes) -> str:
         """Convert public key to Ethereum address"""
@@ -577,22 +587,43 @@ class AdvancedWallet:
         return "0x" + address_bytes.hex()
     
     def get_balance(self) -> WalletBalance:
-        """Get wallet balance"""
-        # This would typically query a blockchain node or indexer
-        # For now, we'll simulate balance calculation
-        total = sum(info.balance for info in self.addresses.values())
-        confirmed = total  # Simulate all confirmed
-        unconfirmed = 0    # No unconfirmed transactions
-        
-        return WalletBalance(
-            total=total,
-            confirmed=confirmed,
-            unconfirmed=unconfirmed,
-            locked=0,
-            available=total,
-            by_address={addr: info.balance for addr, info in self.addresses.items()}
-        )
-    
+    	
+    	total = 0
+    	confirmed = 0
+    	unconfirmed = 0
+    	locked = 0
+    	
+    	by_address = {}
+    	for addr, info in self.addresses.items():
+    		addr_total = getattr(info, "balance", 0)
+    		addr_confirmed = getattr(info, "confirmed", 0)
+    		addr_unconfirmed = getattr(info, "unconfirmed", 0)
+    		addr_locked = getattr(info, "locked", 0)
+    		
+    		# aggregate totals
+    		total += addr_total
+    		confirmed += addr_confirmed
+    		unconfirmed += addr_unconfirmed
+    		locked += addr_locked
+    		
+    		#keep per-address breakdown
+    		by_address[addr] = {
+    		    "total": addr_total,
+    		    "confirmed": addr_confirmed,
+    		    "unconfirmed": addr_unconfirmed,
+    		    "locked": addr_locked,
+    		    "available": addr_confirmed - addr_locked,    		
+    	}
+    	available = confirmed - locked
+    	return WalletBalance(
+    	    total=total,
+    	    confirmed=confirmed,
+    	    unconfirmed=unconfirmed,
+    	    locked=locked,
+    	    available=available,
+    	    by_address=by_address,
+    	)                       
+                		  
     def sign_transaction(self, transaction_data: Dict, private_key: Optional[bytes] = None) -> str:
         """Sign transaction data"""
         try:
@@ -624,6 +655,8 @@ class AdvancedWallet:
         if self.config.address_type == AddressType.ETHEREUM:
             # Ethereum-style serialization
             return self._serialize_eth_transaction(transaction_data)
+        elif self.config.address_type == AddressType.RAYONIX:
+        	return self._serialize_ryx_transaction(transaction_data)        
         else:
             # Bitcoin-style serialization
             return self._serialize_btc_transaction(transaction_data)
@@ -643,7 +676,17 @@ class AdvancedWallet:
         ]
         
         # RLP encoding would go here
-        return json.dumps(elements).encode()
+        return json.dumps(elements).encode()  
+
+    def _serialize_ryx_transaction(self, tx_data: Dict) -> bytes:
+        elements = [
+            tx_data.get("version", 1),
+            tx_data.get("inputs", []),
+            tx_data.get("outputs", []),
+            tx_data.get("fee", 0),
+            tx_data.get("timestamp", int(time.time()))
+        ]        	
+        return json.dumps(elements, sort_keys=True).encode() 	
     
     def _serialize_btc_transaction(self, tx_data: Dict) -> bytes:
         """Serialize Bitcoin transaction"""
@@ -852,6 +895,17 @@ class AdvancedWallet:
                 params.append(f"message={message}")
             if params:
                 uri += "?" + "&".join(params)
+        elif self.config.address_type == AddressType.RAYONIX:
+        	# RAYONIX URI scheme (RYX)
+        	uri = f"rayonix:{address}"
+        	params = []
+        	if amount:
+        		params.append(f"amount={amount}")
+        	if message:
+        		params.append(f"message={message}")
+        	if params:
+        		uri += "?" + "&".join(params)
+        		
         else:
             # Bitcoin URI scheme
             uri = f"bitcoin:{address}"
@@ -1392,6 +1446,8 @@ def get_address_type(address: str) -> Optional[AddressType]:
         return AddressType.BECH32
     elif address.startswith('0x'):
         return AddressType.ETHEREUM
+    elif address.startswith('ryx'):
+    	return AddressType.RAYONIX    	
     else:
         return None
 
@@ -1403,7 +1459,7 @@ if __name__ == "__main__":
     print(f"Master xpub: {xpub}")
     
     # Derive addresses
-    for i in range(5):
+    for i in range(6):
         address_info = wallet.derive_address(i)
         print(f"Address {i}: {address_info.address}")
     
