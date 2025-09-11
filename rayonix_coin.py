@@ -13,7 +13,7 @@ import bech32
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
-import leveldb
+import plyvel
 from merkle import MerkleTree, CompactMerkleTree
 from utxo import UTXOSet, Transaction, UTXO
 from consensus import ProofOfStake, Validator
@@ -21,6 +21,11 @@ from smart_contract import ContractManager, SmartContract
 from database import AdvancedDatabase
 from wallet import AdvancedWallet, WalletConfig
 from p2p_network import AdvancedP2PNetwork, NodeConfig
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 class RayonixCoin:
     
@@ -35,6 +40,8 @@ class RayonixCoin:
         self.contract_manager = ContractManager()
         self.wallet = None
         self.network = None
+        
+        # Initialize database with plyvel
         self.database = AdvancedDatabase(f"{data_dir}/blockchain_db")
         
         # Configuration
@@ -176,7 +183,7 @@ class RayonixCoin:
         """Initialize wallet system"""
         wallet_config = WalletConfig(
             network=self.network_type,
-            address_type='BECH32',
+            address_type='RAYONIX',
             encryption=True
         )
         self.wallet = AdvancedWallet(wallet_config)
@@ -945,6 +952,17 @@ class RayonixCoin:
         
         return False
 
+    def close(self):
+        """Cleanup resources"""
+        if hasattr(self, 'database'):
+            self.database.close()
+        if hasattr(self, 'network'):
+            self.network.stop()
+
+    def __del__(self):
+        """Destructor"""
+        self.close()
+
 # Utility functions
 def create_rayonix_network(network_type: str = "mainnet") -> RayonixCoin:
     """Create RAYONIX network instance"""
@@ -977,41 +995,45 @@ if __name__ == "__main__":
     # Create mainnet instance
     rayonix = RayonixCoin("mainnet")
     
-    # Start network and mining
-    rayonix.connect_to_network()
-    rayonix.start_mining()
-    
-    # Display blockchain info
-    info = rayonix.get_blockchain_info()
-    print(f"RAYONIX Blockchain Info:")
-    print(f"  Height: {info['height']}")
-    print(f"  Total Supply: {info['total_supply']} RXY")
-    print(f"  Circulating Supply: {info['circulating_supply']} RXY")
-    print(f"  Current Reward: {info['block_reward']} RXY")
-    print(f"  Difficulty: {info['difficulty']}")
-    
-    # Create a transaction (example)
-    if rayonix.wallet:
-        address = rayonix.wallet.get_address()
-        balance = rayonix.get_balance(address)
-        print(f"Wallet Balance: {balance} RXY")
-        
-        # Send transaction if we have funds
-        if balance > 10:
-            tx = rayonix.create_transaction(
-                address,
-                "rx1recipientaddressxxxxxxxxxxxxxx",
-                10,
-                fee=1
-            )
-            if tx:
-                print(f"Transaction created: {rayonix._calculate_transaction_hash(tx)[:16]}...")
-    
-    # Keep running
     try:
-        while True:
-            time.sleep(1)
-    except KeyboardInterrupt:
-        print("\nShutting down...")
+        # Start network and mining
+        rayonix.connect_to_network()
+        rayonix.start_mining()
+        
+        # Display blockchain info
+        info = rayonix.get_blockchain_info()
+        print(f"RAYONIX Blockchain Info:")
+        print(f"  Height: {info['height']}")
+        print(f"  Total Supply: {info['total_supply']} RXY")
+        print(f"  Circulating Supply: {info['circulating_supply']} RXY")
+        print(f"  Current Reward: {info['block_reward']} RXY")
+        print(f"  Difficulty: {info['difficulty']}")
+        
+        # Create a transaction (example)
+        if rayonix.wallet:
+            address = rayonix.wallet.get_address()
+            balance = rayonix.get_balance(address)
+            print(f"Wallet Balance: {balance} RXY")
+            
+            # Send transaction if we have funds
+            if balance > 10:
+                tx = rayonix.create_transaction(
+                    address,
+                    "rx1recipientaddressxxxxxxxxxxxxxx",
+                    10,
+                    fee=1
+                )
+                if tx:
+                    print(f"Transaction created: {rayonix._calculate_transaction_hash(tx)[:16]}...")
+        
+        # Keep running
+        try:
+            while True:
+                time.sleep(1)
+        except KeyboardInterrupt:
+            print("\nShutting down...")
+            
+    finally:
         rayonix.stop_mining()
         rayonix.disconnect_from_network()
+        rayonix.close()
