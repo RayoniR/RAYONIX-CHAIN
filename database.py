@@ -105,24 +105,29 @@ class AdvancedDatabase:
         self._start_background_tasks()
     
     def _initialize_database(self):
-        """Initialize the database backend"""
-        Path(self.db_path).mkdir(parents=True, exist_ok=True)
-        
-        if self.config.db_type == DatabaseType.PLYVEL:
-            # Configure plyvel options
-            options = plyvel.Options()
-            options.create_if_missing = self.config.create_if_missing
-            options.error_if_exists = self.config.error_if_exists
-            options.paranoid_checks = self.config.paranoid_checks
-            options.write_buffer_size = self.config.write_buffer_size
-            options.max_open_files = self.config.max_open_files
-            options.block_size = self.config.block_size
-            options.lru_cache_size = self.config.cache_size
-            
-            self.db = plyvel.DB(self.db_path, options=options)
-        
-        elif self.config.db_type == DatabaseType.MEMORY:
-            self.db = {}
+        try:
+            Path(self.db_path).mkdir(parents=True, exist_ok=True)
+            if self.config.db_type == DatabaseType.PLYVEL:
+            	self.db = plyvel.DB(
+            	    self.db_path,
+            	    create_if_missing=self.config.create_if_missing,
+            	    error_if_exists=self.config.error_if_exists,
+            	    paranoid_checks=self.config.paranoid_checks,
+            	    write_buffer_size=self.config.write_buffer_size,
+            	    max_open_files=self.config.max_open_files,
+            	    block_size=self.config.block_size,
+            	    lru_cache_size=self.config.cache_size
+            	)
+            	logger.info(f"Plyvel database initialized at {self.db_path}")
+            elif self.config.db_type == DatabaseType.SQLITE:
+            	pass
+            elif self.config.db_type == DatabaseType.ROCKSDB:
+            	pass
+            elif self.config.db_type == DatabaseType.MEMORY:
+            	self.db = {}
+        except Exception as e:
+        	logger.error(f"Database initialization failed: {e}")
+        	raise                           
         
         # Create default indexes
         self._create_default_indexes()
