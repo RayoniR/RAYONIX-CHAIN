@@ -33,6 +33,7 @@ import dns.resolver
 import random
 import select
 from contextlib import asynccontextmanager
+from asyncio import DatagramProtocol
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -325,7 +326,42 @@ class AdvancedP2PNetwork:
             logger.error(f"TCP connection error: {e}")
             writer.close()
             await writer.wait_closed()
-    
+
+    async def _handle_udp_connection(self, reader, writer):
+    	peer_addr = writer.get_extra_info('peername')
+    	connection_id = f"udp_{peer_addr[0]}_{peer_addr[1]}"
+    	try:
+    		self.logger.info(f"UDP connection from {peer_addr}")
+    		
+    		data = await reader.read(4096)  
+    		if data:
+    			if connection_id not in self.connections:
+    				self.connections[connection_id] = {
+    				    'protocol': ProtocolType.UDP,
+    				    'address': peer_addr,
+    				    'metrics': ConnectionMetrics(),
+    				    'writer': writer  # Store writer for response
+    				}
+    				await self._process_incoming_data(data, peer_addr, ProtocolType.UDP, connection_id)
+    	except Exception as e:
+    		self.logger.error(f"UDP connection error: {e}")
+    	finally:
+    		if connection_id in self.connections:
+    			del self.connections[connection_id]
+    		writer.close()
+    		await writer.wait_closed()
+    		
+    async def _process_incoming_data(self, data: bytes, addr: tuple, protocol: ProtocolType, connection_id: str):
+        try:
+         	 if self.config.enable_encryption:
+         	     data = self._decrypt_data(data, connection_id)
+         	 if self.config.enable_compression:
+         	     data = self._decompress_data(data)
+         	 message = self._deserialize_message(data)
+         	 await self.message_queue.put((connection_id, message))
+        except Exception as e:
+         	self.logger.error(f"Error processing incoming data: {e}")
+           			  	     
     async def _handle_websocket_connection(self, websocket: websockets.WebSocketServerProtocol):
         """Handle incoming WebSocket connection"""
         peer_addr = websocket.remote_address
