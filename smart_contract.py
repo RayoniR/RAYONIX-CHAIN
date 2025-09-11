@@ -12,7 +12,7 @@ from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.exceptions import InvalidSignature
 from enum import Enum, auto
 from dataclasses import dataclass, field
-import plyvel as leveldb
+import leveldb
 import threading
 from concurrent.futures import ThreadPoolExecutor
 import gas
