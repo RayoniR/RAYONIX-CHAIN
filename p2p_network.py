@@ -299,8 +299,23 @@ class AdvancedP2PNetwork:
     
     async def _start_http_server(self):
         """Start HTTP server"""
-        # Implementation would use aiohttp or similar
-        pass
+        try:
+                        
+            server = await asyncio.start_server(
+                self._handle_http_connection,
+                self.config.listen_ip,
+                self.config.listen_port + 2,  # Different port for HTTP
+                reuse_address=True,
+                reuse_port=True
+        )
+                    
+            logger.info(f"HTTP server listening on {self.config.listen_ip}:{self.config.listen_port + 2}")
+                                  
+            async with server:                         	 
+            	await server.serve_forever()  
+                    	       
+        except Exception as e:
+        	logger.error(f"HTTP server error: {e}")        
     
     async def _handle_tcp_connection(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
         """Handle incoming TCP connection"""
@@ -361,7 +376,103 @@ class AdvancedP2PNetwork:
          	 await self.message_queue.put((connection_id, message))
         except Exception as e:
          	self.logger.error(f"Error processing incoming data: {e}")
-           			  	     
+    
+             	         	
+    async def _handle_http_connection(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
+        peer_addr = writer.get_extra_info('peername')
+        connection_id = f"http_{peer_addr[0]}_{peer_addr[1]}"
+        
+        try:
+             self.logger.info(f"HTTP connection from {peer_addr}")
+             
+             request = await reader.read(4096)
+             if request:
+                 # Process HTTP request (could be REST API, RPC, etc.)
+                 response = await self._process_http_request(request, connection_id)
+                 # Send HTTP response
+                 writer.write(response)
+                 await writer.drain()
+        except Exception as e:
+            self.logger.error(f"HTTP connection error: {e}")
+        finally:
+            writer.close()
+            await writer.wait_closed()   			  	       			  	                 			  	
+    async def _handle_https_connection(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
+        peer_addr = writer.get_extra_info('peername')
+        connection_id = f"https_{peer_addr[0]}_{peer_addr[1]}"
+        
+        try:
+            self.logger.info(f"HTTPS connection from {peer_addr}")
+            
+            # Read HTTPS request (encrypted)
+            request = await reader.read(4096)
+            
+            if request:
+                # Process HTTPS request
+                response = await self._process_http_request(request, connection_id)
+                # Send HTTPS response
+                writer.write(response)
+                await writer.drain()
+        except Exception as e:
+            self.logger.error(f"HTTPS connection error: {e}")
+        finally:
+            writer.close()
+            await writer.wait_closed()  			  	     			  	                
+    async def _process_http_request(self, request: bytes, connection_id: str) -> bytes:		  	     		  	              	
+        try:
+            # Parse HTTP request
+            request_str = request.decode('utf-8')
+            lines = request_str.split('\r\n')
+            
+            if not lines:
+                return self._create_http_response(400, "Bad Request")
+            method, path, version = request_line
+            
+            # Handle different HTTP methods and paths
+            if method == 'GET':
+                if path == '/peers':
+                    # Return peer list
+                    peers_data = json.dumps([peer.__dict__ for peer in self.peers.values()])
+                    return self._create_http_response(200, "OK", peers_data, 'application/json')
+                    
+                elif path == '/status':
+                    # Return node status
+                    status = {
+                    'node_id': self.node_id,
+                    'connections': len(self.connections),
+                    'peers': len(self.peers),
+                    'status': 'running'
+                }
+                    return self._create_http_response(200, "OK", json.dumps(status), 'application/json')
+            elif method == 'POST':
+                 if path == '/message':
+                     # Handle message posting
+                     body = self._parse_http_body(request_str)
+                     if body:
+                         message = self._deserialize_message(body.encode())
+                         await self.message_queue.put((connection_id, message))
+                         return self._create_http_response(200, "OK", "Message received")            
+            return self._create_http_response(404, "Not Found")
+        except Exception as e:
+            self.logger.error(f"HTTP request processing error: {e}")
+            return self._create_http_response(500, "Internal Server Error")                   			  	     			  	                 
+    def _create_http_response(self, status_code: int, status_message: str, 
+                         body: str = "", content_type: str = 'text/plain') -> bytes:
+        """Create HTTP response"""
+        response = f"HTTP/1.1 {status_code} {status_message}\r\n"
+        response += "Content-Type: {content_type}\r\n"
+        response += f"Content-Length: {len(body)}\r\n"
+        response += "Connection: close\r\n"
+        response += "\r\n"
+        response += body
+        return response.encode('utf-8')  
+            
+    def _parse_http_body(self, request: str) -> str:
+                               	                        		  	       	"""Parse HTTP request body"""
+                               	                        		  	       	parts = request.split('\r\n\r\n') 	       	
+                               	                        		  	       	if len(parts) > 1:
+                               	                        		  	       		return parts[1]
+                               	                        		  	       	return ""       
     async def _handle_websocket_connection(self, websocket: websockets.WebSocketServerProtocol):
         """Handle incoming WebSocket connection"""
         peer_addr = websocket.remote_address
