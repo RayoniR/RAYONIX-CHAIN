@@ -9,7 +9,7 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec, rsa
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.backends import default_backend
-import plyvel as leveldb
+import plyvel
 import pickle
 from dataclasses import dataclass, field
 from enum import Enum, auto
@@ -185,7 +185,7 @@ class ProofOfStake:
         self.epoch_rewards: Dict[str, int] = {}
         
         # Database for persistence
-        self.db = leveldb.LevelDB(db_path)
+        self.db = plyvel.DB(db_path, create_if_missing=True)
         self._load_state()
         
         # Lock for thread safety
@@ -199,19 +199,32 @@ class ProofOfStake:
         """Load consensus state from database"""
         try:
             # Load validators
-            validators_data = pickle.loads(self.db.Get(b'validators'))
-            self.validators = {k: Validator.from_dict(v) for k, v in validators_data.items()}
+            validators_data_bytes = self.db.get(b'validators')
+            if validators_data_bytes:
+                validators_data = pickle.loads(validators_data_bytes)
+                self.validators = {k: Validator.from_dict(v) for k, v in validators_data.items()}
             
             # Load active validators
-            active_data = pickle.loads(self.db.Get(b'active_validators'))
-            self.active_validators = [Validator.from_dict(v) for v in active_data]
+            active_data_bytes = self.db.get(b'active_validators')
+            if active_data_bytes:
+                active_data = pickle.loads(active_data_bytes)
+                self.active_validators = [Validator.from_dict(v) for v in active_data]
             
             # Load other state
-            self.current_epoch = int.from_bytes(self.db.Get(b'current_epoch'), 'big')
-            self.current_view = int.from_bytes(self.db.Get(b'current_view'), 'big')
-            self.current_round = int.from_bytes(self.db.Get(b'current_round'), 'big')
+            epoch_bytes = self.db.get(b'current_epoch')
+            if epoch_bytes:
+                self.current_epoch = int.from_bytes(epoch_bytes, 'big')
             
-        except KeyError:
+            view_bytes = self.db.get(b'current_view')
+            if view_bytes:
+                self.current_view = int.from_bytes(view_bytes, 'big')
+            
+            round_bytes = self.db.get(b'current_round')
+            if round_bytes:
+                self.current_round = int.from_bytes(round_bytes, 'big')
+            
+        except Exception as e:
+            print(f"Error loading state: {e}")
             # Initialize fresh state
             self._save_state()
     
@@ -220,16 +233,16 @@ class ProofOfStake:
         with self.lock:
             # Save validators
             validators_data = {k: v.to_dict() for k, v in self.validators.items()}
-            self.db.Put(b'validators', pickle.dumps(validators_data))
+            self.db.put(b'validators', pickle.dumps(validators_data))
             
             # Save active validators
             active_data = [v.to_dict() for v in self.active_validators]
-            self.db.Put(b'active_validators', pickle.dumps(active_data))
+            self.db.put(b'active_validators', pickle.dumps(active_data))
             
             # Save other state
-            self.db.Put(b'current_epoch', self.current_epoch.to_bytes(8, 'big'))
-            self.db.Put(b'current_view', self.current_view.to_bytes(8, 'big'))
-            self.db.Put(b'current_round', self.current_round.to_bytes(8, 'big'))
+            self.db.put(b'current_epoch', self.current_epoch.to_bytes(8, 'big'))
+            self.db.put(b'current_view', self.current_view.to_bytes(8, 'big'))
+            self.db.put(b'current_round', self.current_round.to_bytes(8, 'big'))
     
     def _start_background_tasks(self):
         """Start background maintenance tasks"""
