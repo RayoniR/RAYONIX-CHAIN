@@ -38,8 +38,6 @@ logger.addHandler(console_handler)
 class DatabaseType(Enum):
     PLYVEL = auto()
     MEMORY = auto()
-    SQLITE = auto()
-    #ROCKSDB = auto()
 
 class CompressionType(Enum):
     NONE = auto()
@@ -133,8 +131,8 @@ class AdvancedDatabase:
             	logger.info(f"Plyvel database initialized at {self.db_path}")
             elif self.config.db_type == DatabaseType.SQLITE:
             	pass
-            #elif self.config.db_type == DatabaseType.ROCKSDB:
-            	#pass
+            elif self.config.db_type == DatabaseType.ROCKSDB:
+            	pass
             elif self.config.db_type == DatabaseType.MEMORY:
             	self.db = {}
         except Exception as e:
@@ -688,6 +686,24 @@ class AdvancedDatabase:
     def __del__(self):
         """Cleanup on destruction"""
         self.close()
+        
+class IndexManager:
+	"""Manages multiple indexes for the blockchain"""
+	def __init__(self):
+		self.btree_index = BTreeIndex()
+		self.hash_index = HashIndex()
+		self.lsm_index = LSMIndex()  # optional if needed
+		
+	def get_index(self, index_type: str):
+		"""Retrieve an index by type"""
+		if index_type.lower() == "btree":
+			return self.btree_index
+		elif index_type.lower() == "hash":
+			return self.hash_index
+		elif index_type.lower() == "lsm":
+			return self.lsm_index
+		else:
+			raise ValueError(f"Unknown index type: {index_type}")        
 
 # Index implementations
 class BTreeIndex:
