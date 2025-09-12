@@ -47,8 +47,8 @@ from utxo import UTXOSet, UTXO
 from merkle import MerkleTree
 from consensus import ProofOfStake
 from config import get_config
-self.config_manager = get_config()
-self.config = self.config_manager.config
+#self.config_manager = get_config()
+#self.config = self.config_manager.config
 
 class RayonixNode:
     """Complete RAYONIX blockchain node with all components integrated"""
