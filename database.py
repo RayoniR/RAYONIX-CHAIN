@@ -39,6 +39,7 @@ class DatabaseType(Enum):
     PLYVEL = auto()
     MEMORY = auto()
     SQLITE = auto()
+    ROCKSDB = auto()
 
 class CompressionType(Enum):
     NONE = auto()
