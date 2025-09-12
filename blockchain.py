@@ -38,6 +38,14 @@ class Block:
     def calculate_merkle_root(self) -> str:
         tx_hashes = [tx.hash for tx in self.transactions]
         return MerkleTree(tx_hashes).root
+        
+    def merkle_node_to_dict(node):
+    	if node is None:
+    		return None
+    	return {
+        'hash': node.hash,
+        'children': [merkle_node_to_dict(c) for c in getattr(node, 'children', [])]
+    }        
 
     def calculate_hash(self) -> str:
         block_data = json.dumps({
@@ -47,7 +55,7 @@ class Block:
             'validator': self.validator,
             'timestamp': self.timestamp,
             'nonce': self.nonce,
-            'merkle_root': self.merkle_root,
+            'merkle_root': merkle_node_to_dict(self.merkle_root),
             'transaction_count': len(self.transactions)
         }, sort_keys=True)
         return hashlib.sha256(block_data.encode()).hexdigest()
@@ -369,7 +377,8 @@ class Blockchain:
         
         # Re-add transactions to mempool
         self.mempool.extend(block.transactions)
-
+        
+            
     def get_transaction_proof(self, tx_hash: str) -> Optional[Dict]:
         """Get Merkle proof for a transaction"""
         for block in self.chain:
