@@ -98,16 +98,14 @@ class Blockchain:
 
     def _setup_indices(self):
         self.index_manager.create_index('blocks_by_height', lambda b: b['index'])
+        self.index_manager.create_index('blocks_by_hash', lambda b: b['hash'])
+        self.index_manager.create_index('blocks_by_timestamp', lambda b: b['timestamp'])
+        self.index_manager.create_index('transactions_by_hash', lambda tx: tx['hash'])
+        self.index_manager.create_index('blocks_by_validator', lambda b: b.validator)
+        self.index_manager.create_index('transactions_by_address', lambda tx: tx['from'])
+        self.index_manager.create_index('transactions_by_address', lambda tx: tx['to'])
 
-self.index_manager.create_index('blocks_by_hash', lambda b: b['hash'])
 
-self.index_manager.create_index('blocks_by_timestamp', lambda b: b['timestamp'])
-
-self.index_manager.create_index('transactions_by_hash', lambda tx: tx['hash'])
-self.index_manager.create_index('blocks_by_validator', lambda b: b.validator)
-self.index_manager.create_index('transactions_by_address', lambda tx: tx['from'])
-
-self.index_manager.create_index('transactions_by_address', lambda tx: tx['to'])
 
     def _load_chain(self):
         genesis_data = self.db.get('genesis_block')
