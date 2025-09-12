@@ -37,15 +37,8 @@ class Block:
 
     def calculate_merkle_root(self) -> str:
         tx_hashes = [tx.hash for tx in self.transactions]
-        return MerkleTree(tx_hashes).root
-        
-    def merkle_node_to_dict(self, node):
-    	if node is None:
-    		return None
-    	return {
-        'hash': node.hash,
-        'children': [self.merkle_node_to_dict(c) for c in getattr(node, 'children', [])]
-    }        
+        merkle_tree = MerkleTree(tx_hashes)
+        return merkle_tree.root.hash if hasattr(merkle_tree.root, 'hash') else str(merkle_tree.root)            
 
     def calculate_hash(self) -> str:
         block_data = json.dumps({
@@ -55,7 +48,7 @@ class Block:
             'validator': self.validator,
             'timestamp': self.timestamp,
             'nonce': self.nonce,
-            'merkle_root': merkle_node_to_dict(self.merkle_root),
+            'merkle_root': self.merkle_root,  # This is now a string, not a node object
             'transaction_count': len(self.transactions)
         }, sort_keys=True)
         return hashlib.sha256(block_data.encode()).hexdigest()
@@ -70,7 +63,7 @@ class Block:
             'timestamp': self.timestamp,
             'nonce': self.nonce,
             'validator_signature': self.validator_signature,
-            'merkle_root': self.merkle_root,
+            'merkle_root': self.merkle_root,  # String hash
             'transactions': [tx.to_dict() for tx in self.transactions]
         }
 
