@@ -41,7 +41,14 @@ from wallet import (
 )
 from p2p_network import AdvancedP2PNetwork, NodeConfig, NetworkType, ProtocolType
 from consensus import ProofOfStake, Validator
-from smart_contract import ContractManager, SmartContract, StandardContracts
+from smart_contract import (
+    ContractManager,
+    SmartContract,
+    ContractType,
+    ContractState,
+    ExecutionResult,
+    ContractStorage
+)
 from database import AdvancedDatabase, DatabaseConfig
 from utxo import UTXOSet, UTXO
 from merkle import MerkleTree
