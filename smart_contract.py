@@ -49,6 +49,11 @@ class ExecutionResult:
     
     def to_dict(self) -> Dict:
         return {
+            #'address': self.address,
+            #'creator': self.creator,
+            #'code': self.code,
+            #'state': self.state,
+            #'balance': self.balance,
             'success': self.success,
             'return_value': self.return_value,
             'gas_used': self.gas_used,

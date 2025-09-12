@@ -111,10 +111,34 @@ class Blockchain:
     def _load_chain(self):
         genesis_data = self.db.get('genesis_block')
         if genesis_data:
-            self.chain = [Block.from_dict(b) for b in self.db.get('chain', [])]
-            self.utxo_set = self.db.get('utxo_set', UTXOSet())
-            self.consensus = self.db.get('consensus_state', ProofOfStake())
-            self.contract_manager = self.db.get('contracts_state', ContractManager())
+            chain_data = self.db.get('chain', [])
+            self.chain = [Block.from_dict(b) for b in chain_data]
+            
+            # Reconstruct UTXO set
+            utxo_data = self.db.get('utxo_set', {})
+            self.utxo_set = UTXOSet()
+            for utxo_id, utxo_dict in utxo_data.items():
+            	utxo = UTXO.from_dict(utxo_dict)
+            	self.utxo_set.utxos[utxo_id] = utxo
+            # Reconstruct consensus state
+            consensus_data = self.db.get('consensus_state', {})
+            self.consensus = ProofOfStake(min_stake=consensus_data.get('min_stake', 1000))
+            for addr, validator_dict in consensus_data.get('validators', {}).items():
+            	validator = Validator.from_dict(validator_dict)
+            	self.consensus.validators[addr] = validator
+            self.consensus.total_stake = consensus_data.get('total_stake', 0)
+            
+            # Reconstruct contracts state
+            contracts_data = self.db.get('contracts_state', {})
+            self.contract_manager = ContractManager()
+            for addr, contract_dict in contracts_data.get('contracts', {}).items():
+            	contract = SmartContract.from_dict(contract_dict)
+            	self.contract_manager.contracts[addr] = contract
+            self.contract_manager.balances = contracts_data.get('balances', {})
+            
+            # Reconstruct mempool
+            mempool_data = self.db.get('mempool', [])
+            self.mempool = [Transaction.from_dict(tx) for tx in mempool_data]
         else:
             self._create_genesis_block()
 
@@ -141,9 +165,28 @@ class Blockchain:
     def _save_state(self):
         chain_data = [block.to_dict() for block in self.chain]
         self.db.put('chain', chain_data)
+        
+        # Store UTXO set as serializable data, not the object itself
+        utxo_data = {utxo_id: utxo.to_dict() for utxo_id, utxo in self.utxo_set.utxos.items()}
         self.db.put('utxo_set', self.utxo_set)
+        
+        # Store consensus state as serializable data
+        consensus_data = {
+        'validators': {addr: validator.to_dict() for addr, validator in self.consensus.validators.items()},
+        'min_stake': self.consensus.min_stake,
+        'total_stake': self.consensus.total_stake
+    }
         self.db.put('consensus_state', self.consensus)
+        
+        # Store contracts state as serializable data
+        contracts_data = {
+        'contracts': {addr: contract.to_dict() for addr, contract in self.contract_manager.contracts.items()},
+        'balances': self.contract_manager.balances
+    }
         self.db.put('contracts_state', self.contract_manager)
+        
+        # Store mempool as serializable data
+        mempool_data = [tx.to_dict() for tx in self.mempool]
         self.db.put('mempool', self.mempool)
 
     def _update_utxo_set(self, block: Block):
