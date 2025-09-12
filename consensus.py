@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 from enum import Enum, auto
 from datetime import datetime, timedelta
 import asyncio
+from typing import Any
 
 class ConsensusState(Enum):
     """Consensus process states"""
