@@ -12,9 +12,10 @@ from cryptography.exceptions import InvalidSignature
 from merkle import MerkleTree
 from utxo import UTXOSet, Transaction, UTXO
 from consensus import ProofOfStake, Validator
-from database import AdvancedDatabase,IndexManager
+from database import AdvancedDatabase,create_index, IndexConfig, IndexType
 from smart_contract import ContractManager, SmartContract
 from config import get_config
+from index_manager import IndexManager, IndexConfig
 
 #self.config_manager = get_config()
 #port = self.config_manager.get('network.listen_port')
@@ -83,7 +84,7 @@ class Block:
 class Blockchain:
     def __init__(self, db_path: str = './blockchain_db'):
         self.db = AdvancedDatabase(db_path)
-        self.index_manager = IndexManager()
+        self.index_manager = IndexManager(db_path) 
         self.utxo_set = UTXOSet()
         self.consensus = ProofOfStake(min_stake=1000)
         self.contract_manager = ContractManager()
@@ -96,10 +97,17 @@ class Blockchain:
         self._load_chain()
 
     def _setup_indices(self):
-        self.index_manager.create_index('blocks_by_height', lambda b: b.index)
+        self.index_manager.create_index('blocks_by_height', lambda b: b['index'])
+
+self.index_manager.create_index('blocks_by_hash', lambda b: b['hash'])
+
+self.index_manager.create_index('blocks_by_timestamp', lambda b: b['timestamp'])
+
+self.index_manager.create_index('transactions_by_hash', lambda tx: tx['hash'])
         self.index_manager.create_index('blocks_by_validator', lambda b: b.validator)
-        self.index_manager.create_index('transactions_by_address', 
-                                      lambda tx: tx.get_related_addresses())
+        self.index_manager.create_index('transactions_by_address', lambda tx: tx['from'])
+
+self.index_manager.create_index('transactions_by_address', lambda tx: tx['to'])
 
     def _load_chain(self):
         genesis_data = self.db.get('genesis_block')
