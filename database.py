@@ -38,6 +38,8 @@ logger.addHandler(console_handler)
 class DatabaseType(Enum):
     PLYVEL = auto()
     MEMORY = auto()
+    ROCKSDB = auto()
+    SQLITE = auto()
 
 class CompressionType(Enum):
     NONE = auto()
