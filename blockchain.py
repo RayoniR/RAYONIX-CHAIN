@@ -12,7 +12,7 @@ from cryptography.exceptions import InvalidSignature
 from merkle import MerkleTree
 from utxo import UTXOSet, Transaction, UTXO
 from consensus import ProofOfStake, Validator
-from database import BlockchainDB #IndexManager
+from database import AdvancedDatabase
 from smart_contract import ContractManager, SmartContract
 from config import get_config
 self.config_manager = get_config()
