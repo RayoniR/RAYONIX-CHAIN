@@ -122,11 +122,11 @@ class Blockchain:
             	self.utxo_set.utxos[utxo_id] = utxo
             # Reconstruct consensus state
             consensus_data = self.db.get('consensus_state', {})
-            self.consensus = ProofOfStake(min_stake=consensus_data.get('min_stake', 1000))
-            for addr, validator_dict in consensus_data.get('validators', {}).items():
-            	validator = Validator.from_dict(validator_dict)
-            	self.consensus.validators[addr] = validator
-            self.consensus.total_stake = consensus_data.get('total_stake', 0)
+            self.consensus = ProofOfStake.from_dict(consensus_data)
+            #for addr, validator_dict in consensus_data.get('validators', {}).items():
+            	#validator = Validator.from_dict(validator_dict)
+            	#self.consensus.validators[addr] = validator
+            #self.consensus.total_stake = consensus_data.get('total_stake', 0)
             
             # Reconstruct contracts state
             contracts_data = self.db.get('contracts_state', {})
@@ -171,11 +171,7 @@ class Blockchain:
         self.db.put('utxo_set', self.utxo_set)
         
         # Store consensus state as serializable data
-        consensus_data = {
-        'validators': {addr: validator.to_dict() for addr, validator in self.consensus.validators.items()},
-        'min_stake': self.consensus.min_stake,
-        'total_stake': self.consensus.total_stake
-    }
+        consensus_data = self.consensus.to_dict()
         self.db.put('consensus_state', self.consensus)
         
         # Store contracts state as serializable data

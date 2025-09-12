@@ -77,7 +77,7 @@ class Validator:
             'slashing_count': self.slashing_count,
             'voting_power': self.voting_power,
             'jail_until': self.jail_until,
-            'delegators': self.delegators
+            'delegators': self.delegators              
         }
     
     @classmethod
@@ -186,6 +186,10 @@ class ProofOfStake:
         
         # Database for persistence
         self.db = plyvel.DB(db_path, create_if_missing=True)
+        
+        # ADD COMPATIBILITY ATTRIBUTES
+        self.total_stake = 0  # Total stake across all validators
+        self._compatibility_mode = True  # Flag for blockchain compatibility       
         self._load_state()
         
         # Lock for thread safety
@@ -223,14 +227,25 @@ class ProofOfStake:
             if round_bytes:
                 self.current_round = int.from_bytes(round_bytes, 'big')
             
+            # Load total_stake for compatibility
+            total_stake_bytes = self.db.get(b'total_stake')
+            if total_stake_bytes:
+            	self.total_stake = int.from_bytes(total_stake_bytes, 'big')
+            else:
+            	self.update_total_stake()  # Calculate if not stored
+            
         except Exception as e:
             print(f"Error loading state: {e}")
             # Initialize fresh state
+            self.update_total_stake()
             self._save_state()
     
     def _save_state(self):
         """Save consensus state to database"""
         with self.lock:
+            # Update total stake before saving
+            self.update_total_stake()
+            
             # Save validators
             validators_data = {k: v.to_dict() for k, v in self.validators.items()}
             self.db.put(b'validators', pickle.dumps(validators_data))
@@ -243,6 +258,7 @@ class ProofOfStake:
             self.db.put(b'current_epoch', self.current_epoch.to_bytes(8, 'big'))
             self.db.put(b'current_view', self.current_view.to_bytes(8, 'big'))
             self.db.put(b'current_round', self.current_round.to_bytes(8, 'big'))
+            self.db.put(b'total_stake', self.total_stake.to_bytes(8, 'big'))  # Save total_stake
     
     def _start_background_tasks(self):
         """Start background maintenance tasks"""
