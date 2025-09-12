@@ -39,12 +39,12 @@ class Block:
         tx_hashes = [tx.hash for tx in self.transactions]
         return MerkleTree(tx_hashes).root
         
-    def merkle_node_to_dict(node):
+    def merkle_node_to_dict(self, node):
     	if node is None:
     		return None
     	return {
         'hash': node.hash,
-        'children': [merkle_node_to_dict(c) for c in getattr(node, 'children', [])]
+        'children': [self.merkle_node_to_dict(c) for c in getattr(node, 'children', [])]
     }        
 
     def calculate_hash(self) -> str:
