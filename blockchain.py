@@ -104,8 +104,8 @@ self.index_manager.create_index('blocks_by_hash', lambda b: b['hash'])
 self.index_manager.create_index('blocks_by_timestamp', lambda b: b['timestamp'])
 
 self.index_manager.create_index('transactions_by_hash', lambda tx: tx['hash'])
-        self.index_manager.create_index('blocks_by_validator', lambda b: b.validator)
-        self.index_manager.create_index('transactions_by_address', lambda tx: tx['from'])
+self.index_manager.create_index('blocks_by_validator', lambda b: b.validator)
+self.index_manager.create_index('transactions_by_address', lambda tx: tx['from'])
 
 self.index_manager.create_index('transactions_by_address', lambda tx: tx['to'])
 
