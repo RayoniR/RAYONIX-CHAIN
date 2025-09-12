@@ -281,6 +281,66 @@ class ProofOfStake:
         threading.Thread(target=epoch_processor, daemon=True).start()
         threading.Thread(target=validator_updater, daemon=True).start()
         threading.Thread(target=jail_checker, daemon=True).start()
+        
+    def validate_validator(self, address: str) -> bool:
+        """Check if validator is active and valid - for blockchain compatibility"""
+        with self.validator_lock:
+        	return (address in self.validators and 
+               self.validators[address].status == ValidatorStatus.ACTIVE)
+               
+    def add_validator_simple(self, address: str, stake: int) -> bool:
+        """Simple validator addition for blockchain compatibility"""
+        # Generate a dummy public key for compatibility
+        dummy_public_key = "dummy_public_key_" + address
+        return self.register_validator(address, dummy_public_key, stake, 0.1)
+        
+    def update_total_stake(self):
+        """Update total stake calculation"""
+        with self.validator_lock:
+        	self.total_stake = sum(
+            (v.staked_amount + v.total_delegated) 
+            for v in self.validators.values()
+        )                                                                       
+        
+    def validate_block(self, block: Any) -> bool:
+    	"""Validate block for blockchain compatibility"""
+    	# Basic validation - check if validator exists and is active
+    	if not self.validate_validator(block.validator):
+    		return False
+    	# Additional validation can be added here
+    	# For now, just return True for basic compatibility
+    	return True        
+
+    def to_dict(self) -> Dict:
+    	"""Convert to dictionary for serialization - blockchain compatibility"""
+    	with self.validator_lock:
+    		self.update_total_stake()
+    		return {
+            'validators': {addr: validator.to_dict() for addr, validator in self.validators.items()},
+            'min_stake': self.min_stake,
+            'total_stake': self.total_stake,
+            'active_validators': [v.to_dict() for v in self.active_validators],
+            'current_epoch': self.current_epoch,
+            'compatibility_mode': self._compatibility_mode
+        }
+        
+    @classmethod
+    def from_dict(cls, data: Dict) -> 'ProofOfStake':
+    	"""Create from dictionary for deserialization - blockchain compatibility"""
+    	min_stake = data.get('min_stake', 1000)
+    	pos = cls(min_stake=min_stake)
+    	# Load validators
+    	validators_data = data.get('validators', {})
+    	for addr, validator_data in validators_data.items():
+    		pos.validators[addr] = Validator.from_dict(validator_data)
+    		
+    		# Load active validators
+    		active_data = data.get('active_validators', [])
+    		pos.active_validators = [Validator.from_dict(v) for v in active_data]
+    		pos.total_stake = data.get('total_stake', 0)
+    		pos.current_epoch = data.get('current_epoch', 0)
+    		pos._compatibility_mode = data.get('compatibility_mode', True)
+    		return pos    		    	                        
     
     def register_validator(self, address: str, public_key: str, stake_amount: int, 
                           commission_rate: float = 0.1) -> bool:
@@ -307,16 +367,17 @@ class ProofOfStake:
                 return False
             
             validator = Validator(
-                address=address,
-                public_key=public_key,
-                staked_amount=stake_amount,
-                commission_rate=commission_rate,
-                status=ValidatorStatus.PENDING,
-                created_block_height=self.current_epoch * self.epoch_blocks
-            )
+            address=address,
+            public_key=public_key,
+            staked_amount=stake_amount,
+            commission_rate=commission_rate,
+            status=ValidatorStatus.PENDING,
+            created_block_height=self.current_epoch * self.epoch_blocks
+        )
             
             self.validators[address] = validator
             self.pending_validators.append(validator)
+            self.total_stake += stake_amount  # UPDATE total_stake
             self._save_state()
             
             return True
@@ -346,6 +407,7 @@ class ProofOfStake:
             current_delegation = validator.delegators.get(delegator_address, 0)
             validator.delegators[delegator_address] = current_delegation + amount
             validator.total_delegated += amount
+            self.total_stake += amount  # UPDATE total_stake
             
             self._save_state()
             return True
