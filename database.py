@@ -39,7 +39,7 @@ class DatabaseType(Enum):
     PLYVEL = auto()
     MEMORY = auto()
     SQLITE = auto()
-    ROCKSDB = auto()
+    #ROCKSDB = auto()
 
 class CompressionType(Enum):
     NONE = auto()
@@ -133,8 +133,8 @@ class AdvancedDatabase:
             	logger.info(f"Plyvel database initialized at {self.db_path}")
             elif self.config.db_type == DatabaseType.SQLITE:
             	pass
-            elif self.config.db_type == DatabaseType.ROCKSDB:
-            	pass
+            #elif self.config.db_type == DatabaseType.ROCKSDB:
+            	#pass
             elif self.config.db_type == DatabaseType.MEMORY:
             	self.db = {}
         except Exception as e:
