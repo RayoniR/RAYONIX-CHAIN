@@ -84,7 +84,7 @@ class Block:
 class Blockchain:
     def __init__(self, db_path: str = './blockchain_db'):
         self.db = AdvancedDatabase(db_path)
-        self.index_manager = IndexManager(db_path) 
+        self.index_manager = IndexManager(self.db) 
         self.utxo_set = UTXOSet()
         self.consensus = ProofOfStake(min_stake=1000)
         self.contract_manager = ContractManager()
