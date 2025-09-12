@@ -4,7 +4,7 @@ import json
 import time
 import random
 import threading
-from typing import Dict, List, Optional, Tuple, Set
+from typing import Dict, List, Optional, Tuple, Set, Any
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec, rsa
 from cryptography.exceptions import InvalidSignature
@@ -15,7 +15,6 @@ from dataclasses import dataclass, field
 from enum import Enum, auto
 from datetime import datetime, timedelta
 import asyncio
-from typing import Any
 
 class ConsensusState(Enum):
     """Consensus process states"""
@@ -188,9 +187,10 @@ class ProofOfStake:
         # Database for persistence
         self.db = plyvel.DB(db_path, create_if_missing=True)
         
-        # ADD COMPATIBILITY ATTRIBUTES
+        # COMPATIBILITY ATTRIBUTES
         self.total_stake = 0  # Total stake across all validators
-        self._compatibility_mode = True  # Flag for blockchain compatibility       
+        self._compatibility_mode = True  # Flag for blockchain compatibility
+        
         self._load_state()
         
         # Lock for thread safety
@@ -231,16 +231,16 @@ class ProofOfStake:
             # Load total_stake for compatibility
             total_stake_bytes = self.db.get(b'total_stake')
             if total_stake_bytes:
-            	self.total_stake = int.from_bytes(total_stake_bytes, 'big')
+                self.total_stake = int.from_bytes(total_stake_bytes, 'big')
             else:
-            	self.update_total_stake()  # Calculate if not stored
+                self.update_total_stake()  # Calculate if not stored
             
         except Exception as e:
             print(f"Error loading state: {e}")
             # Initialize fresh state
             self.update_total_stake()
             self._save_state()
-    
+        
     def _save_state(self):
         """Save consensus state to database"""
         with self.lock:
@@ -265,7 +265,7 @@ class ProofOfStake:
         """Start background maintenance tasks"""
         def epoch_processor():
             while True:
-                time.sleep(30)  #Check every 30 seconds
+                time.sleep(30)  # Check every 30 seconds
                 self._process_epoch_transition()
         
         def validator_updater():
@@ -282,66 +282,69 @@ class ProofOfStake:
         threading.Thread(target=epoch_processor, daemon=True).start()
         threading.Thread(target=validator_updater, daemon=True).start()
         threading.Thread(target=jail_checker, daemon=True).start()
-        
+    
+    # BLOCKCHAIN COMPATIBILITY METHODS
     def validate_validator(self, address: str) -> bool:
         """Check if validator is active and valid - for blockchain compatibility"""
         with self.validator_lock:
-        	return (address in self.validators and 
-               self.validators[address].status == ValidatorStatus.ACTIVE)
-               
+            return (address in self.validators and 
+                   self.validators[address].status == ValidatorStatus.ACTIVE)
+    
+    def validate_block(self, block: Any) -> bool:
+        """Validate block for blockchain compatibility"""
+        # Basic validation - check if validator exists and is active
+        if not self.validate_validator(block.validator):
+            return False
+        # Additional validation can be added here
+        return True
+    
     def add_validator_simple(self, address: str, stake: int) -> bool:
         """Simple validator addition for blockchain compatibility"""
         # Generate a dummy public key for compatibility
         dummy_public_key = "dummy_public_key_" + address
         return self.register_validator(address, dummy_public_key, stake, 0.1)
-        
+    
     def update_total_stake(self):
         """Update total stake calculation"""
         with self.validator_lock:
-        	self.total_stake = sum(
-            (v.staked_amount + v.total_delegated) 
-            for v in self.validators.values()
-        )                                                                       
-        
-    def validate_block(self, block: Any) -> bool:
-    	"""Validate block for blockchain compatibility"""
-    	# Basic validation - check if validator exists and is active
-    	if not self.validate_validator(block.validator):
-    		return False
-    	# Additional validation can be added here
-    	# For now, just return True for basic compatibility
-    	return True        
-
+            self.total_stake = sum(
+                (v.staked_amount + v.total_delegated) 
+                for v in self.validators.values()
+            )
+    
     def to_dict(self) -> Dict:
-    	"""Convert to dictionary for serialization - blockchain compatibility"""
-    	with self.validator_lock:
-    		self.update_total_stake()
-    		return {
-            'validators': {addr: validator.to_dict() for addr, validator in self.validators.items()},
-            'min_stake': self.min_stake,
-            'total_stake': self.total_stake,
-            'active_validators': [v.to_dict() for v in self.active_validators],
-            'current_epoch': self.current_epoch,
-            'compatibility_mode': self._compatibility_mode
-        }
-        
+        """Convert to dictionary for serialization - blockchain compatibility"""
+        with self.validator_lock:
+            self.update_total_stake()
+            return {
+                'validators': {addr: validator.to_dict() for addr, validator in self.validators.items()},
+                'min_stake': self.min_stake,
+                'total_stake': self.total_stake,
+                'active_validators': [v.to_dict() for v in self.active_validators],
+                'current_epoch': self.current_epoch,
+                'compatibility_mode': self._compatibility_mode
+            }
+    
     @classmethod
     def from_dict(cls, data: Dict) -> 'ProofOfStake':
-    	"""Create from dictionary for deserialization - blockchain compatibility"""
-    	min_stake = data.get('min_stake', 1000)
-    	pos = cls(min_stake=min_stake)
-    	# Load validators
-    	validators_data = data.get('validators', {})
-    	for addr, validator_data in validators_data.items():
-    		pos.validators[addr] = Validator.from_dict(validator_data)
-    		
-    		# Load active validators
-    		active_data = data.get('active_validators', [])
-    		pos.active_validators = [Validator.from_dict(v) for v in active_data]
-    		pos.total_stake = data.get('total_stake', 0)
-    		pos.current_epoch = data.get('current_epoch', 0)
-    		pos._compatibility_mode = data.get('compatibility_mode', True)
-    		return pos    		    	                        
+        """Create from dictionary for deserialization - blockchain compatibility"""
+        min_stake = data.get('min_stake', 1000)
+        pos = cls(min_stake=min_stake)
+        
+        # Load validators
+        validators_data = data.get('validators', {})
+        for addr, validator_data in validators_data.items():
+            pos.validators[addr] = Validator.from_dict(validator_data)
+        
+        # Load active validators
+        active_data = data.get('active_validators', [])
+        pos.active_validators = [Validator.from_dict(v) for v in active_data]
+        
+        pos.total_stake = data.get('total_stake', 0)
+        pos.current_epoch = data.get('current_epoch', 0)
+        pos._compatibility_mode = data.get('compatibility_mode', True)
+        
+        return pos
     
     def register_validator(self, address: str, public_key: str, stake_amount: int, 
                           commission_rate: float = 0.1) -> bool:
@@ -368,13 +371,13 @@ class ProofOfStake:
                 return False
             
             validator = Validator(
-            address=address,
-            public_key=public_key,
-            staked_amount=stake_amount,
-            commission_rate=commission_rate,
-            status=ValidatorStatus.PENDING,
-            created_block_height=self.current_epoch * self.epoch_blocks
-        )
+                address=address,
+                public_key=public_key,
+                staked_amount=stake_amount,
+                commission_rate=commission_rate,
+                status=ValidatorStatus.PENDING,
+                created_block_height=self.current_epoch * self.epoch_blocks
+            )
             
             self.validators[address] = validator
             self.pending_validators.append(validator)
@@ -440,6 +443,7 @@ class ProofOfStake:
             
             validator.delegators[delegator_address] = current_delegation - amount
             validator.total_delegated -= amount
+            self.total_stake -= amount  # UPDATE total_stake
             
             if validator.delegators[delegator_address] == 0:
                 del validator.delegators[delegator_address]
