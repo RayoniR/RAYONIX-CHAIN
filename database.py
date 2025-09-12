@@ -224,8 +224,13 @@ class AdvancedDatabase:
         
         with self.lock:
             try:
-                # Serialize value
-                serialized_value = self._serialize_value(value)
+                # Serialize value using safe method
+                try:
+                	serialized_value = self._serialize_value(value)
+                except DatabaseError:
+                	# Fallback to safe serialization
+                	serialized_value = self._safe_serialize(value)
+                #serialized_value = self._serialize_value(value)
                 
                 # Compress if enabled
                 if self.compression:
@@ -578,24 +583,66 @@ class AdvancedDatabase:
     
     def _serialize_value(self, value: Any) -> bytes:
         """Serialize value for storage"""
-        if isinstance(value, bytes):
-            return value
-        elif isinstance(value, str):
-            return value.encode('utf-8')
-        else:
-            return pickle.dumps(value, protocol=pickle.HIGHEST_PROTOCOL)
+        try:
+        	if isinstance(value, bytes):
+        		return value
+        	elif isinstance(value, str):
+        		return value.encode('utf-8')
+        	else:
+        		# Check if value contains non-serializable objects
+        		if hasattr(value, '__dict__'):
+        			# For objects, create a safe serializable representation
+        			obj_dict = value.__dict__.copy()
+        			for key, val in list(obj_dict.items()):
+        				# Remove non-serializable attributes
+        				if hasattr(val, '__class__'):
+        					class_name = str(type(val))
+        					if any(db_type in class_name for db_type in ['DB', 'Connection', 'Lock', 'Thread']):
+        						del obj_dict[key]
+        					return pickle.dumps(obj_dict, protocol=pickle.HIGHEST_PROTOCOL)
+        				else:
+        					# For other types, try normal serialization
+        					return pickle.dumps(value, protocol=pickle.HIGHEST_PROTOCOL)
+        except (TypeError, pickle.PickleError) as e:
+        		# Fallback: convert to string representation
+            try:
+            	return str(value).encode('utf-8')
+            except:                     	
+                raise DatabaseError(f"Cannot serialize value: {value}")	        		      	
     
     def _deserialize_value(self, value: bytes) -> Any:
         """Deserialize value from storage"""
         try:
             return pickle.loads(value)
-        except (pickle.UnpicklingError, TypeError):
+        except (pickle.UnpicklingError, TypeError, AttributeError):          
             # Try to decode as string
             try:
                 return value.decode('utf-8')
             except UnicodeDecodeError:
                 return value
-    
+                
+    def _safe_serialize(self, value: Any) -> bytes:
+    	"""Safely serialize objects that might contain non-serializable attributes"""
+            	
+    	if hasattr(value, '__getstate__'):
+    		# Use custom serialization if available
+    		return pickle.dumps(value.__getstate__(), protocol=pickle.HIGHEST_PROTOCOL)
+    	elif hasattr(value, '__dict__'):
+    		# Create a safe dict representation
+    		safe_dict = {}
+    		for key, val in value.__dict__.items():
+                    			
+    			# Skip non-serializable attributes
+    			if not hasattr(val, '__class__') or not any(
+                db_type in str(type(val)) for db_type in ['DB', 'Connection', 'Lock', 'Thread']
+            ):
+    			    safe_dict[key] = val
+    			return pickle.dumps(safe_dict, protocol=pickle.HIGHEST_PROTOCOL)
+    	else:
+            # Fallback to string representation
+            return str(value).encode('utf-8')    			      
+    			      
+                            
     def _prepare_value_for_storage(self, value: Any, ttl: Optional[int] = None) -> bytes:
         """Prepare value for storage with metadata"""
         serialized = self._serialize_value(value)
@@ -689,24 +736,6 @@ class AdvancedDatabase:
         """Cleanup on destruction"""
         self.close()
         
-class IndexManager:
-	"""Manages multiple indexes for the blockchain"""
-	def __init__(self):
-		self.btree_index = BTreeIndex()
-		self.hash_index = HashIndex()
-		self.lsm_index = LSMIndex()  # optional if needed
-		
-	def get_index(self, index_type: str):
-		"""Retrieve an index by type"""
-		if index_type.lower() == "btree":
-			return self.btree_index
-		elif index_type.lower() == "hash":
-			return self.hash_index
-		elif index_type.lower() == "lsm":
-			return self.lsm_index
-		else:
-			raise ValueError(f"Unknown index type: {index_type}")        
-
 # Index implementations
 class BTreeIndex:
     """B-Tree index implementation"""
