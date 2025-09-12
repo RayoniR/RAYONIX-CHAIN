@@ -191,11 +191,13 @@ class ProofOfStake:
         self.total_stake = 0  # Total stake across all validators
         self._compatibility_mode = True  # Flag for blockchain compatibility
         
-        self._load_state()
+        #self._load_state()
         
         # Lock for thread safety
         self.lock = threading.RLock()
         self.validator_lock = threading.RLock()
+        
+        self._load_state()
         
         # Start background tasks
         self._start_background_tasks()
