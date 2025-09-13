@@ -586,10 +586,10 @@ Available Commands:
         try:
             print("[NO CONTENT FOUND]rayonix> create-wallet")
             # Unpack the tuple correctly
-            wallet, mnemonic, xpub = RayonixWallet.create_new_wallet()
+            wallet, mnemonic, xpub = AdvancedWallet.create_new_wallet()
             
             # Auto-backup the wallet
-            backup_path = RayonixWallet.auto_backup_wallet(wallet)
+            backup_path = AdvancedWallet.auto_backup_wallet(wallet)
             if backup_path:
             	print(f"2025-09-13 14:57:35,783 - RayonixWallet - INFO - Wallet backed up to {backup_path}")
             	print(f"2025-09-13 14:57:35,783 - RayonixWallet - INFO - Auto-backup created: {backup_path}")
