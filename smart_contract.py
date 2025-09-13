@@ -537,6 +537,7 @@ class ContractManager:
         self.db_path = db_path
         self.db = plyvel.DB(db_path, create_if_missing=True)
         self.contracts: Dict[str, SmartContract] = {}
+        self.balances: Dict[str, int] = {}
         self.lock = threading.RLock()
         self.executor = ThreadPoolExecutor(max_workers=10)
         
