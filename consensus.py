@@ -1,4 +1,5 @@
 # consensus.py
+import os
 import hashlib
 import json
 import time
