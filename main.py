@@ -583,35 +583,16 @@ Available Commands:
     
     def _create_wallet(self):
         """Create a new wallet"""
-        try:
-            print("[NO CONTENT FOUND]rayonix> create-wallet")
-            # Unpack the tuple correctly
-            wallet, mnemonic, xpub = AdvancedWallet.create_new_wallet()
-            
-            # Auto-backup the wallet
-            backup_path = AdvancedWallet.auto_backup_wallet(wallet)
-            if backup_path:
-            	print(f"2025-09-13 14:57:35,783 - RayonixWallet - INFO - Wallet backed up to {backup_path}")
-            	print(f"2025-09-13 14:57:35,783 - RayonixWallet - INFO - Auto-backup created: {backup_path}")
-            print("2025-09-13 14:57:36,270 - RayonixWallet - INFO - HD wallet created successfully")
-            print("New wallet created:")
-            print(f"  Mnemonic: {mnemonic}")
-            print(f"  Extended Public Key (xpub): {xpub}")
-            
-            print("\n  --- Derived Addresses ---")
-            # Loop to derive and display multiple addresses
-            for i in range(5):
-            	address_info = wallet.derive_address(i)
-            	print(f"  Address {i}: {address_info.address}")
-        except Exception as e:
-            print(f"2025-09-13 14:57:36,270 - RayonixNode - ERROR - Error executing command create-wallet: {e}")
-            self.logger.exception(f"Error executing command create-wallet: {e}")             
-        #wallet = create_new_wallet()
-        #self.wallet = wallet
-        #print(f"New wallet created:")
-        #print(f"  Address: {wallet.address}")
-        #print(f"  Public Key: {wallet.public_key[:30]}...")
-        #print("  Private Key: [HIDDEN] - Save this securely!")
+        if self.wallet:
+            print("Wallet already loaded. Use 'load-wallet' to switch.")
+            return
+        
+        wallet = create_new_wallet()
+        self.wallet = wallet
+        print(f"New wallet created:")
+        print(f"  Address: {wallet.address}")
+        print(f"  Public Key: {wallet.public_key[:30]}...")
+        print("  Private Key: [HIDDEN] - Save this securely!")
     
     def _load_wallet(self, args: List[str]):
         """Load wallet from file"""
