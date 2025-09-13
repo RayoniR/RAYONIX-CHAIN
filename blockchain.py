@@ -87,6 +87,7 @@ class Blockchain:
         self.db = AdvancedDatabase(db_path)
         self.index_manager = IndexManager(self.db) 
         self.utxo_set = UTXOSet()
+        consensus_db_path = str(db_path) + "_consensus"
         self.consensus = ProofOfStake(min_stake=1000)
         self.contract_manager = ContractManager()
         self.difficulty = 4
