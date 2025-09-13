@@ -126,7 +126,7 @@ class Blockchain:
             consensus_data = self.db.get('consensus_state', {})
             if consensus_data:
                 
-                self.consensus = ProofOfStake.from_dict(consensus_data)
+                self.consensus.load_from_dict(consensus_data)
             else:
             	consensus_db_path = str(self.db.db_path) + "_consensus"
             	self.consensus = ProofOfStake(min_stake=1000, db_path=consensus_db_path)
