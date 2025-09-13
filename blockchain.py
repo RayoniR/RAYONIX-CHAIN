@@ -88,6 +88,7 @@ class Blockchain:
         self.index_manager = IndexManager(self.db) 
         self.utxo_set = UTXOSet()
         consensus_db_path = str(db_path) + "_consensus"
+        print(f"DEBUG: Using consensus DB path: {consensus_db_path}")  # Add debug print
         self.consensus = ProofOfStake(min_stake=1000)
         self.contract_manager = ContractManager()
         self.difficulty = 4
@@ -123,7 +124,12 @@ class Blockchain:
             	self.utxo_set.utxos[utxo_id] = utxo
             # Reconstruct consensus state
             consensus_data = self.db.get('consensus_state', {})
-            self.consensus = ProofOfStake.from_dict(consensus_data)
+            if consensus_data:
+                
+                self.consensus = ProofOfStake.from_dict(consensus_data)
+            else:
+            	consensus_db_path = str(self.db.db_path) + "_consensus"
+            	self.consensus = ProofOfStake(min_stake=1000, db_path=consensus_db_path)
             #for addr, validator_dict in consensus_data.get('validators', {}).items():
             	#validator = Validator.from_dict(validator_dict)
             	#self.consensus.validators[addr] = validator
