@@ -185,7 +185,7 @@ class ProofOfStake:
         self.epoch_rewards: Dict[str, int] = {}
         
         # Database for persistence
-        self.db = plyvel.DB(db_path, create_if_missing=True)
+        #self.db = plyvel.DB(db_path, create_if_missing=True)
         
         # COMPATIBILITY ATTRIBUTES
         self.total_stake = 0  # Total stake across all validators
