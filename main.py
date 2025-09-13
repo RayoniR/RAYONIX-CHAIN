@@ -26,7 +26,7 @@ logger = logging.getLogger("RayonixNode")
 
 # Import all components
 from blockchain import Blockchain, Block, Transaction
-from wallet import AdvancedWallet, WalletConfig
+from wallet import AdvancedWallet,WalletConfig, WalletType, AddressType, create_new_wallet, validate_address
 from p2p_network import AdvancedP2PNetwork, NodeConfig, NetworkType, ProtocolType, MessageType
 from consensus import ProofOfStake, Validator
 from smart_contract import ContractManager, SmartContract
