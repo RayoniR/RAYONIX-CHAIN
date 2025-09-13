@@ -1377,6 +1377,24 @@ class AdvancedWallet:
         self.encryption_key = None
         
         logger.info("Wallet closed successfully")
+        
+    def get_mnemonic(self) -> Optional[str]:
+    	"""Get the mnemonic phrase used to create the wallet (if available)"""
+    	return getattr(self, '_creation_mnemonic', None)   
+    	
+    def get_master_xpub(self) -> Optional[str]:
+    	"""Get the master extended public key"""
+    	if hasattr(self, '_master_xpub'):
+    		return self._master_xpub
+    	try:
+    	    return self._get_master_xpub()
+    	except ValueError:
+    	    return None
+    	        	              	          
+    def get_addresses(self, limit: int = 10) -> List[str]:
+    	"""Get list of addresses (optionally limited)"""
+    	addresses = list(self.addresses.keys())
+    	return addresses[:limit] if limit > 0 else addresses         	          
 
 # Utility functions
 def create_new_wallet(wallet_type: WalletType = WalletType.HD, **kwargs) -> AdvancedWallet:
@@ -1386,10 +1404,19 @@ def create_new_wallet(wallet_type: WalletType = WalletType.HD, **kwargs) -> Adva
     
     if wallet_type == WalletType.HD:
         mnemonic_phrase, xpub = wallet.create_hd_wallet()
-        return wallet, mnemonic_phrase, xpub
+        
+        wallet._creation_mnemonic = mnemonic_phrase
+        
+        wallet._master_xpub = xpub
+        logger.info(f"HD wallet created with mnemonic: {mnemonic_phrase[:10]}...")
     else:
-        wallet.create_from_private_key(os.urandom(32).hex(), wallet_type)
-        return wallet, None, None
+        private_key = os.urandom(32).hex()
+        wallet.create_from_private_key(private_key, wallet_type)
+        wallet._creation_mnemonic = None  # No mnemonic for non-HD wallets
+        wallet._master_xpub = wallet._get_master_xpub() if wallet.master_key else None
+        logger.info("Non-HD wallet created successfully") 
+               
+    return wallet
 
 def load_existing_wallet(wallet_file: str, passphrase: Optional[str] = None) -> Optional[AdvancedWallet]:
     """Load existing wallet from file"""
@@ -1454,7 +1481,10 @@ def get_address_type(address: str) -> Optional[AddressType]:
 # Example usage
 if __name__ == "__main__":
     # Create a new HD wallet
-    wallet, mnemonic, xpub = create_new_wallet()
+    wallet = create_new_wallet()
+    mnemonic = wallet.get_mnemonic()
+    xpub = wallet.get_master_xpub()
+    
     print(f"Mnemonic: {mnemonic}")
     print(f"Master xpub: {xpub}")
     
@@ -1481,4 +1511,4 @@ if __name__ == "__main__":
     wallet.backup("wallet_backup.dat", "secure_passphrase")
     
     # Close wallet
-    wallet.close()        
+    wallet.close()
