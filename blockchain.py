@@ -168,22 +168,22 @@ class Blockchain:
         
         # Store UTXO set as serializable data, not the object itself
         utxo_data = {utxo_id: utxo.to_dict() for utxo_id, utxo in self.utxo_set.utxos.items()}
-        self.db.put('utxo_set', self.utxo_set)
+        self.db.put('utxo_set', utxo_data)
         
         # Store consensus state as serializable data
         consensus_data = self.consensus.to_dict()
-        self.db.put('consensus_state', self.consensus)
+        self.db.put('consensus_state', consensus_data)
         
         # Store contracts state as serializable data
         contracts_data = {
         'contracts': {addr: contract.to_dict() for addr, contract in self.contract_manager.contracts.items()},
         'balances': self.contract_manager.balances
     }
-        self.db.put('contracts_state', self.contract_manager)
+        self.db.put('contracts_state', contracts_data)
         
         # Store mempool as serializable data
         mempool_data = [tx.to_dict() for tx in self.mempool]
-        self.db.put('mempool', self.mempool)
+        self.db.put('mempool', mempool_data)
 
     def _update_utxo_set(self, block: Block):
         for tx in block.transactions:
