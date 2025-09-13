@@ -601,16 +601,18 @@ class AdvancedDatabase:
         					class_name = str(type(val))
         					if any(db_type in class_name for db_type in ['DB', 'Connection', 'Lock', 'Thread']):
         						del obj_dict[key]
+        				try:
         					return pickle.dumps(obj_dict, protocol=pickle.HIGHEST_PROTOCOL)
-        				else:
+        				except (TypeError, pickle.PickleError):
+        					return str(value).encode('utf-8')
+        			try:
         					# For other types, try normal serialization
-        					return pickle.dumps(value, protocol=pickle.HIGHEST_PROTOCOL)
-        except (TypeError, pickle.PickleError) as e:
-        		# Fallback: convert to string representation
-            try:
-            	return str(value).encode('utf-8')
-            except:                     	
-                raise DatabaseError(f"Cannot serialize value: {value}")	        		      	
+        				return pickle.dumps(value, protocol=pickle.HIGHEST_PROTOCOL)
+        			except (TypeError, pickle.PickleError):
+        				return str(value).encode('utf-8')
+        except Exception as e:
+        	raise DatabaseError(f"Serialization failed for value: {value}. Reason: {e}")
+        	        		      	
     
     def _deserialize_value(self, value: bytes) -> Any:
         """Deserialize value from storage"""
