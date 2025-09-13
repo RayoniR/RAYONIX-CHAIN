@@ -584,7 +584,9 @@ class AdvancedDatabase:
     def _serialize_value(self, value: Any) -> bytes:
         """Serialize value for storage"""
         try:
-        	if isinstance(value, bytes):
+        	if value is None:
+        		return b'null'
+        	elif isinstance(value, bytes):
         		return value
         	elif isinstance(value, str):
         		return value.encode('utf-8')

@@ -148,6 +148,8 @@ class Blockchain:
             outputs=[{'address': 'genesis', 'amount': 1000000}],
             locktime=0
         )
+        # Make sure the transaction hash is calculated
+        genesis_tx.hash = genesis_tx.calculate_hash()
         
         genesis_block = Block(
             index=0,
@@ -157,13 +159,30 @@ class Blockchain:
             timestamp=1630000000,
             nonce=0
         )
+        # Make sure block hash is calculated
+        genesis_block.hash = genesis_block.calculate_hash()
+        genesis_block.merkle_root = genesis_block.calculate_merkle_root()
         
         self.chain = [genesis_block]
         self._update_utxo_set(genesis_block)
         self._save_state()
 
     def _save_state(self):
-        chain_data = [block.to_dict() for block in self.chain]
+        print(f"DEBUG: Saving state, chain length: {len(self.chain)}")
+        chain_data = []
+        for block in self.chain:
+        	try:
+        		block_dict = block.to_dict()
+        		# Verify all transactions are properly serialized
+        		for tx in block_dict['transactions']:
+        			if not isinstance(tx, dict):
+        				# If transaction is not a dict, convert it
+        				if hasattr(tx, 'to_dict'):
+        					tx = tx.to_dict()
+        		chain_data.append(block_dict)
+        	except Exception as e:
+        		print(f"Error serializing block {block.index}: {e}")
+        		raise
         self.db.put('chain', chain_data)
         
         # Store UTXO set as serializable data, not the object itself
