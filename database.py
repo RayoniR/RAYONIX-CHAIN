@@ -229,8 +229,12 @@ class AdvancedDatabase:
                 	serialized_value = self._serialize_value(value)
                 except DatabaseError:
                 	# Fallback to safe serialization
+                	logger.error(f"Primary serialization failed: {serialize_error}, using safe fallback")
                 	serialized_value = self._safe_serialize(value)
-                #serialized_value = self._serialize_value(value)
+                	
+                if serialized_value is None:
+                	logger.error("Serialization returned None, using empty bytes")
+                	serialized_value = b''                
                 
                 # Compress if enabled
                 if self.compression:
@@ -585,35 +589,52 @@ class AdvancedDatabase:
         """Serialize value for storage"""
         try:
         	if value is None:
-        		return b'null'
+        		logger.warning("Attempted to serialize None value, returning empty bytes")
+        		return b''
         	elif isinstance(value, bytes):
         		return value
         	elif isinstance(value, str):
         		return value.encode('utf-8')
+        	elif isinstance(value, (int, float, bool)):
+        		return str(value).encode('utf-8')
         	else:
-        		# Check if value contains non-serializable objects
-        		if hasattr(value, '__dict__'):
-        			# For objects, create a safe serializable representation
-        			obj_dict = value.__dict__.copy()
-        			for key, val in list(obj_dict.items()):
-        				# Remove non-serializable attributes
-        				if hasattr(val, '__class__'):
-        					class_name = str(type(val))
-        					if any(db_type in class_name for db_type in ['DB', 'Connection', 'Lock', 'Thread']):
-        						del obj_dict[key]
-        				try:
-        					return pickle.dumps(obj_dict, protocol=pickle.HIGHEST_PROTOCOL)
-        				except (TypeError, pickle.PickleError):
-        					return str(value).encode('utf-8')
+        		try:
+        			return json.dumps(value, default=self._json_default).encode('utf-8')
+        		except (TypeError, ValueError) as json_error:
+        			logger.debug(f"JSON serialization failed: {json_error}, trying pickle")
         			try:
-        					# For other types, try normal serialization
         				return pickle.dumps(value, protocol=pickle.HIGHEST_PROTOCOL)
-        			except (TypeError, pickle.PickleError):
-        				return str(value).encode('utf-8')
+        			except (pickle.PickleError, TypeError) as pickle_error:
+        				logger.warning(f"Pickle serialization failed: {pickle_error}, using string representation")
+        				return self._safe_string_representation(value).encode('utf-8')
         except Exception as e:
-        	raise DatabaseError(f"Serialization failed for value: {value}. Reason: {e}")
-        	        		      	
-    
+        	logger.error(f"Serialization error for value {type(value)}: {e}")
+        	return b'serialization_error'
+        		        	        		      	
+    def _json_default(self, obj):
+    	"""Default JSON serializer for non-serializable objects"""
+    	if hasattr(obj, '__dict__'):
+    		safe_dict = {}
+    		for key, val in obj.__dict__.items():
+    		    try:
+    		    	json.dumps(val)
+    		    	safe_dict[key] = val
+    		    except (TypeError, ValueError):
+    		    	safe_dict[key] = str(val)
+    		return safe_dict
+    	elif hasattr(obj, '__str__'):
+    		return str(obj)
+    	else:
+    	    return f"<{type(obj).__name__} object>"
+    	    
+    def _safe_string_representation(self, value: Any) -> str:
+        """Safe string representation that never fails"""
+        try:
+            return str(value)
+        except:
+            return f"<{type(value).__name__} object at {id(value)}>"  		        	    	    	    
+          		        	    	    	    
+    		    
     def _deserialize_value(self, value: bytes) -> Any:
         """Deserialize value from storage"""
         try:
@@ -626,26 +647,52 @@ class AdvancedDatabase:
                 return value
                 
     def _safe_serialize(self, value: Any) -> bytes:
-    	"""Safely serialize objects that might contain non-serializable attributes"""
+    	"""Safely serialize objects that might contain non-serializable attributes"""      	
             	
-    	if hasattr(value, '__getstate__'):
+    	if value is None:
     		# Use custom serialization if available
-    		return pickle.dumps(value.__getstate__(), protocol=pickle.HIGHEST_PROTOCOL)
-    	elif hasattr(value, '__dict__'):
-    		# Create a safe dict representation
-    		safe_dict = {}
-    		for key, val in value.__dict__.items():
-                    			
-    			# Skip non-serializable attributes
-    			if not hasattr(val, '__class__') or not any(
-                db_type in str(type(val)) for db_type in ['DB', 'Connection', 'Lock', 'Thread']
-            ):
-    			    safe_dict[key] = val
+    		logger.warning("Safe serialize received None, returning empty bytes")
+    		return b''
+    	try:
+    		# Try to get a state for objects with __getstate__
+    		if hasattr(value, '__getstate__'):
+    			try:
+    				state = value.__getstate__()
+    				return pickle.dumps(state, protocol=pickle.HIGHEST_PROTOCOL)
+    			except:
+    				pass
+    		# For objects with __dict__, create a safe representation
+    		if hasattr(value, '__dict__'):
+    			safe_dict = {}
+    			for key, val in value.__dict__.items():
+    				# Skip obviously non-serializable objects
+    				if not self._is_non_serializable(val):
+    					try:
+    						# Test if serializable
+    						pickle.dumps(val)
+    						safe_dict[key] = val
+    					except:
+    						safe_dict[key] = str(val)
     			return pickle.dumps(safe_dict, protocol=pickle.HIGHEST_PROTOCOL)
-    	else:
-            # Fallback to string representation
-            return str(value).encode('utf-8')    			      
-    			      
+    		# Final fallback
+    		return self._safe_string_representation(value).encode('utf-8')
+    	except Exception as e:
+    		logger.error(f"Safe serialization failed: {e}")
+    		return b'safe_serialization_error'
+    	    		      
+    def _is_non_serializable(self, obj: Any) -> bool:
+        """Check if an object is likely non-serializable"""
+        if obj is None:
+            return False
+        if isinstance(obj, (str, int, float, bool, bytes, list, dict, tuple)):
+            return False
+        if hasattr(obj, '__class__'):
+            class_name = str(type(obj))
+            # Check for common non-serializable types
+            non_serializable_patterns = ['DB', 'Connection', 'Lock', 'Thread', 'File', 'Socket']
+            return any(pattern in class_name for pattern in non_serializable_patterns)
+        return False
+                                                                                                                 			      
                             
     def _prepare_value_for_storage(self, value: Any, ttl: Optional[int] = None) -> bytes:
         """Prepare value for storage with metadata"""
