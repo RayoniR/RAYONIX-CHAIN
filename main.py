@@ -26,36 +26,16 @@ logger = logging.getLogger("RayonixNode")
 
 # Import all components
 from blockchain import Blockchain, Block, Transaction
-from wallet import (
-    AdvancedWallet,
-    WalletConfig,
-    WalletType,
-    KeyDerivation,
-    AddressType,
-    create_new_wallet,
-    load_existing_wallet,
-    validate_address,
-    KeyPair,
-    Transaction,
-    AddressInfo
-)
-from p2p_network import AdvancedP2PNetwork, NodeConfig, NetworkType, ProtocolType
+from wallet import AdvancedWallet, WalletConfig
+from p2p_network import AdvancedP2PNetwork, NodeConfig, NetworkType, ProtocolType, MessageType
 from consensus import ProofOfStake, Validator
-from smart_contract import (
-    ContractManager,
-    SmartContract,
-    ContractType,
-    ContractState,
-    ExecutionResult,
-    ContractStorage
-)
+from smart_contract import ContractManager, SmartContract
 from database import AdvancedDatabase, DatabaseConfig
 from utxo import UTXOSet, UTXO
 from merkle import MerkleTree
 from consensus import ProofOfStake
 from config import get_config
-#self.config_manager = get_config()
-#self.config = self.config_manager.config
+from index_manager import IndexManager, IndexConfig
 
 class RayonixNode:
     """Complete RAYONIX blockchain node with all components integrated"""
@@ -97,7 +77,7 @@ class RayonixNode:
             'staking_enabled': True,
             'api_enabled': False,
             'log_level': 'INFO',
-            'db_type': 'leveldb',
+            'db_type': 'plyvel',
             'compression': 'snappy',
             'encryption': 'fernet'
         }
@@ -178,17 +158,17 @@ class RayonixNode:
             
             # Register message handlers
             self.network.register_message_handler(
-                self.network.MessageType.BLOCK, 
-                self._handle_block_message
-            )
+            MessageType.BLOCK, 
+            self._handle_block_message
+        )
             self.network.register_message_handler(
-                self.network.MessageType.TRANSACTION,
-                self._handle_transaction_message
-            )
+            MessageType.TRANSACTION,
+            self._handle_transaction_message
+        )
             self.network.register_message_handler(
-                self.network.MessageType.CONSENSUS,
-                self._handle_consensus_message
-            )
+            MessageType.CONSENSUS,
+            self._handle_consensus_message
+        )
             
             logger.info("Network initialized")
             
