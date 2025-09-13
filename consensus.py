@@ -161,6 +161,7 @@ class ProofOfStake:
             epoch_blocks: Number of blocks per epoch
             max_validators: Maximum number of active validators
         """
+        print(f"DEBUG: ProofOfStake using DB path: {db_path}")
         self.min_stake = min_stake
         self.jail_duration = jail_duration
         self.slash_percentage = slash_percentage
