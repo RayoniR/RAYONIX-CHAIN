@@ -150,7 +150,7 @@ class ProofOfStake:
     
     def __init__(self, min_stake: int = 1000, jail_duration: int = 3600,
                  slash_percentage: float = 0.01, epoch_blocks: int = 100,
-                 max_validators: int = 100, db_path: str = './consensus_db'):
+                 max_validators: int = 100, db_path: str = None):
         """
         Initialize Proof-of-Stake consensus
         
@@ -160,8 +160,7 @@ class ProofOfStake:
             slash_percentage: Percentage of stake to slash for violations
             epoch_blocks: Number of blocks per epoch
             max_validators: Maximum number of active validators
-        """
-        print(f"DEBUG: ProofOfStake using DB path: {db_path}")
+        """        
         self.min_stake = min_stake
         self.jail_duration = jail_duration
         self.slash_percentage = slash_percentage
@@ -184,6 +183,10 @@ class ProofOfStake:
         
         self.state = ConsensusState.IDLE
         self.epoch_rewards: Dict[str, int] = {}
+        
+        if db_path is None:
+        	db_path = f"./consensus_db_{os.getpid()}"  # Unique path
+        	print(f"DEBUG: ProofOfStake using DB path: {db_path}")
         
         # Database for persistence
         self.db = plyvel.DB(db_path, create_if_missing=True)
