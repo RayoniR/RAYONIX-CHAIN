@@ -89,7 +89,7 @@ class Blockchain:
         self.utxo_set = UTXOSet()
         consensus_db_path = str(db_path) + "_consensus"
         print(f"DEBUG: Using consensus DB path: {consensus_db_path}")  # Add debug print
-        self.consensus = ProofOfStake(min_stake=1000)
+        self.consensus = ProofOfStake(min_stake=1000, db_path=consensus_db_path)
         self.contract_manager = ContractManager()
         self.difficulty = 4
         self.block_time_target = 30
